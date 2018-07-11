@@ -1,0 +1,36 @@
+{
+  "name": "norman",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zenwarr/norman.git"
+  },
+  "author": "zenwarr",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/zenwarr/norman/issues"
+  },
+  "homepage": "https://github.com/zenwarr/norman#readme",
+  "devDependencies": {
+    "@types/chalk": "^2.2.0",
+    "@types/chokidar": "^1.7.5",
+    "@types/fs-extra": "^5.0.4",
+    "@types/node": "^10.5.2",
+    "typescript": "^2.9.2"
+  },
+  "dependencies": {
+    "chalk": "^2.4.1",
+    "fs-extra": "^6.0.1",
+    "git-url-parse": "^9.0.1",
+    "sync-directory": "^2.0.0"
+  },
+  "bin": {
+    "norman": "./index.js"
+  }
+}
