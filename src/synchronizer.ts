@@ -28,7 +28,8 @@ export default class ModuleSynchronizer {
 
         let watcher: chokidar.FSWatcher = sync(module.path, targetPath, {
           watch: true,
-          exclude: [ "node_modules", /.tsx?$/, /.js.map$/, ".git" ]
+          exclude: [ "node_modules", /.tsx?$/, /.js.map$/, ".git" ],
+          type: "copy"
         });
 
         watcher.on("error", (error: Error) => {
