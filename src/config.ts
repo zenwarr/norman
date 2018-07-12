@@ -17,6 +17,7 @@ export interface ModuleInfo {
   npmInstall: boolean;
   buildCommands: string[];
   branch: string;
+  path: string;
 }
 
 const DEFAULT_MODULE_INFO: Partial<ModuleInfo> = {
@@ -112,18 +113,26 @@ function moduleFromConfig(inputConfig: any, moduleConfig: any): ModuleInfo {
       repository: moduleConfig,
       name: fullName,
       npmName: npmNameFromPackageName(fullName),
-      branch
+      branch,
+      path: path.join(inputConfig.modulesDirectory, fullName)
     }) as ModuleInfo;
   }
 
+  let fullName = gitUrlParse(moduleConfig.repository).full_name;
   if (!moduleConfig.name) {
-    moduleConfig.name = gitUrlParse(moduleConfig.repository).full_name
+    moduleConfig.name = fullName;
   }
 
   moduleConfig.branch = branch;
 
   if (!moduleConfig.npmName) {
     moduleConfig.npmName = npmNameFromPackageName(moduleConfig.name);
+  }
+
+  if (!moduleConfig.path) {
+    moduleConfig.path = path.join(inputConfig.modulesDirectory, fullName);
+  } else if (!path.isAbsolute(moduleConfig.path)) {
+    throw new Error(`Path for module ${fullName} has to be absolute: ${moduleConfig.path}`);
   }
 
   return Object.assign({}, DEFAULT_MODULE_INFO, moduleConfig);
