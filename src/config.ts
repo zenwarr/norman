@@ -18,6 +18,7 @@ export interface ModuleInfo {
   buildCommands: string[];
   branch: string;
   path: string;
+  ignoreOrg: boolean;
 }
 
 const DEFAULT_MODULE_INFO: Partial<ModuleInfo> = {
@@ -28,6 +29,7 @@ const DEFAULT_MODULE_INFO: Partial<ModuleInfo> = {
 export interface Config {
   modulesDirectory: string;
   modules: ModuleInfo[];
+  defaultIgnoreOrg: boolean;
   app: AppConfig;
 }
 
@@ -37,7 +39,8 @@ export interface AppConfig {
 }
 
 const DEFAULT_CONFIG: Partial<Config> = {
-  modules: []
+  modules: [],
+  defaultIgnoreOrg: false
 };
 
 const CONFIG_FILE_NAME = ".norman.json";
@@ -114,7 +117,8 @@ function moduleFromConfig(inputConfig: any, moduleConfig: any): ModuleInfo {
       name: fullName,
       npmName: npmNameFromPackageName(fullName),
       branch,
-      path: path.join(inputConfig.modulesDirectory, fullName)
+      path: path.join(inputConfig.modulesDirectory, fullName),
+      ignoreOrg: false
     }) as ModuleInfo;
   }
 
@@ -129,8 +133,12 @@ function moduleFromConfig(inputConfig: any, moduleConfig: any): ModuleInfo {
     moduleConfig.npmName = npmNameFromPackageName(moduleConfig.name);
   }
 
+  if (moduleConfig.ignoreOrg == null) {
+    moduleConfig.ignoreOrg = inputConfig.defaultIgnoreOrg != null ? inputConfig.defaultIgnoreOrg : false;
+  }
+
   if (!moduleConfig.path) {
-    moduleConfig.path = path.join(inputConfig.modulesDirectory, fullName);
+    moduleConfig.path = path.join(inputConfig.modulesDirectory, moduleConfig.ignoreOrg ? moduleConfig.npmName.pkg : fullName);
   } else if (!path.isAbsolute(moduleConfig.path)) {
     throw new Error(`Path for module ${fullName} has to be absolute: ${moduleConfig.path}`);
   }
