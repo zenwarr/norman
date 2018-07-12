@@ -52,7 +52,7 @@ export default class ModuleFetcher {
 
   async relinkModule(module: ModuleInfo) {
     if (!module.npmInstall) {
-      // we did not installed node_modules, so no need to relink it
+      // we did not install node_modules, so no need to relink it
       return;
     }
 
@@ -61,9 +61,9 @@ export default class ModuleFetcher {
       let installedPath = path.join(modulePath, depModule.npmName.name);
       try {
         fs.statSync(installedPath);
-        console.log(chalk.green(`relinking module ${module.path} → ${installedPath}`));
+        console.log(chalk.green(`relinking module ${depModule.path} → ${installedPath}`));
         fs.removeSync(installedPath);
-        fs.symlinkSync(module.path, installedPath);
+        fs.symlinkSync(depModule.path, installedPath);
       } catch (error) {
         if (error.code !== "ENOENT") {
           throw error;

@@ -66,7 +66,7 @@ export function loadConfig(): Config {
 
     let config: any;
     try {
-      config = Object.assign(DEFAULT_CONFIG, JSON.parse(rawConfig));
+      config = Object.assign({}, DEFAULT_CONFIG, JSON.parse(rawConfig));
     } catch (error) {
       // invalid config, stop here
       throw new Error(`Invalid config file ${configLocation}: ${error.message}`);
@@ -83,6 +83,28 @@ export function loadConfig(): Config {
 
     // build module list from urls
     config.modules = config.modules.map(moduleFromConfig.bind(null, config));
+
+    if (config.includeModules) {
+      let includeModules = Array.isArray(config.includeModules) ? config.includeModules : [ config.includeModules ];
+      for (let includeConfig of includeModules) {
+        if (!path.isAbsolute(includeConfig)) {
+          includeConfig = path.resolve(dir, includeConfig);
+        }
+        try {
+          let extraModules = loadModulesFromConfig(includeConfig).filter(extraModule => {
+            // ignore conflicting modules
+            if (config.modules.find((module: ModuleInfo) => module.repository === extraModule.repository) != null) {
+              console.log(chalk.yellow(`Ignoring module "${extraModule.repository}" because it has been already loaded`));
+              return false;
+            }
+            return true;
+          });
+          config.modules = config.modules.concat(extraModules);
+        } catch (error) {
+          throw new Error(`Failed to include modules from config at "${includeConfig}" (while parsing config at "${configLocation}": ${error.message}`);
+        }
+      }
+    }
 
     if (!config.app) {
       config.app = { };
@@ -154,4 +176,35 @@ function npmNameFromPackageName(name: string): ModuleNpmName {
   } else {
     return { org: "", pkg: name, name };
   }
+}
+
+
+function loadModulesFromConfig(file: string): ModuleInfo[] {
+  if (fs.statSync(file).isDirectory()) {
+    file = path.join(file, CONFIG_FILE_NAME);
+  }
+
+  let rawConfig = fs.readFileSync(file, {
+    encoding: "utf-8"
+  });
+
+  let config: any;
+  try {
+    config = Object.assign({}, DEFAULT_CONFIG, JSON.parse(rawConfig));
+  } catch (error) {
+    // invalid config, stop here
+    throw new Error(`Invalid config file ${file}: ${error.message}`);
+  }
+
+  if (!config.modulesDirectory) {
+    throw new Error(`No valid "modulesDirectory" option found in configuration file loaded from ${file}`);
+  }
+
+  // make modulesDirectory absolute
+  if (!path.isAbsolute(config.modulesDirectory)) {
+    config.modulesDirectory = path.resolve(path.dirname(file), config.modulesDirectory);
+  }
+
+  // build module list from urls
+  return config.modules.map(moduleFromConfig.bind(null, config));
 }
