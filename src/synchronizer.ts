@@ -6,6 +6,8 @@ import * as chokidar from "chokidar";
 import * as semver from "semver";
 import * as utils from "./utils";
 
+const ignore = require("ignore");
+
 
 interface DepInfo {
   name: string;
@@ -55,6 +57,38 @@ export default class ModuleSynchronizer {
       return;
     }
 
+    // set up ignores
+    for (let module of this.config.modules) {
+      let ignorePath: string;
+      if (module.npmIgnore === true) {
+        // try to load .npmignore file from the package and use it
+        ignorePath = path.join(module.path, ".npmignore");
+        if (!fs.existsSync(ignorePath)) {
+          // keep silence
+          continue;
+        }
+      } else if (typeof module.npmIgnore === "string") {
+        // use custom ignore file instead
+        ignorePath = module.npmIgnore;
+      } else {
+        continue;
+      }
+
+      try {
+        console.log(`loading ignore rules from ${ignorePath}`);
+        let ignoreLines = fs.readFileSync(ignorePath, { encoding: "utf-8" }).split("\n");
+
+        let ignoreInstance = ignore();
+        for (let ignoreLine of ignoreLines) {
+          ignoreInstance.add(ignoreLine);
+        }
+
+        this.ignoreInstances[module.name] = ignoreInstance;
+      } catch (error) {
+        throw new Error(`Failed to load custom ignore file for module ${module.npmName.name}: ${error.message}`);
+      }
+    }
+
     for (let module of this.config.modules) {
       if (this.watchModule(module)) {
         ++watchingCount;
@@ -74,6 +108,7 @@ export default class ModuleSynchronizer {
 
   protected initedModules: string[] = [ ];
   protected watchers: { [name: string]: chokidar.FSWatcher|undefined } = { };
+  protected ignoreInstances: { [name: string]: any } = { };
 
   protected async copyFile(module: ModuleInfo, moduleAppPath: string, sourceFilePath: string): Promise<string[]> {
     let relpath = path.relative(module.path, sourceFilePath);
@@ -99,7 +134,18 @@ export default class ModuleSynchronizer {
     return [ targetFilePath ];
   }
 
+  protected isIgnored(module: ModuleInfo, sourceFilePath: string): boolean {
+    if (this.ignoreInstances[module.name]) {
+      return this.ignoreInstances[module.name].ignores(sourceFilePath);
+    }
+    return false;
+  }
+
   protected async onAddFile(module: ModuleInfo, moduleAppPath: string, sourceFilePath: string) {
+    if (this.isIgnored(module, sourceFilePath)) {
+      return;
+    }
+
     let syncDone = this.initialSyncDone(module);
     let targetFiles = await this.copyFile(module, moduleAppPath, sourceFilePath);
     if (syncDone) {
@@ -108,6 +154,10 @@ export default class ModuleSynchronizer {
   }
 
   protected async onChangeFile(module: ModuleInfo, moduleAppPath: string, sourceFilePath: string) {
+    if (this.isIgnored(module, sourceFilePath)) {
+      return;
+    }
+
     let syncDone = this.initialSyncDone(module);
     let targetFiles = await this.copyFile(module, moduleAppPath, sourceFilePath);
     if (syncDone) {
@@ -116,6 +166,10 @@ export default class ModuleSynchronizer {
   }
 
   protected async onRemoveFile(module: ModuleInfo, moduleAppPath: string, sourceFilePath: string) {
+    if (this.isIgnored(module, sourceFilePath)) {
+      return;
+    }
+
     let relpath = path.relative(module.path, sourceFilePath);
     let targetFilePath = path.join(moduleAppPath, relpath);
 
@@ -130,17 +184,27 @@ export default class ModuleSynchronizer {
   }
 
   protected async onAddDir(module: ModuleInfo, moduleAppPath: string, sourceFilePath: string) {
+    if (this.isIgnored(module, sourceFilePath)) {
+      return;
+    }
+
     let relpath = path.relative(module.path, sourceFilePath);
     if (!relpath) { // root module directory, skip it
       return;
     }
 
     let targetFilePath = path.join(moduleAppPath, relpath);
-    fs.copySync(sourceFilePath, targetFilePath);
+    let fileMode = fs.statSync(sourceFilePath).mode;
+    fs.mkdirpSync(targetFilePath);
+    fs.chmodSync(targetFilePath, fileMode);
     this.logChange(module, "NEW", sourceFilePath, moduleAppPath, targetFilePath);
   }
 
   protected async onRemoveDir(module: ModuleInfo, moduleAppPath: string, sourceFilePath: string) {
+    if (this.isIgnored(module, sourceFilePath)) {
+      return;
+    }
+
     let targetFilePath = path.join(moduleAppPath, path.relative(module.path, sourceFilePath));
     fs.removeSync(targetFilePath);
     this.logChange(module, "DEL", sourceFilePath, moduleAppPath, targetFilePath);
@@ -324,7 +388,7 @@ export default class ModuleSynchronizer {
       watcher.on("unlink", this.onRemoveFile.bind(this, module, moduleAppPath));
       watcher.on("addDir", this.onAddDir.bind(this, module, moduleAppPath));
       watcher.on("unlinkDir", this.onRemoveDir.bind(this, module, moduleAppPath));
-      watcher.on("error", error => console.log(`error: ${error.message}`));
+      watcher.on("error", error => console.log(chalk.red(`watcher error: ${error.message}`)));
       watcher.on("ready", () => this.initedModules.push(module.name));
 
       this.watchers[module.name] = watcher;

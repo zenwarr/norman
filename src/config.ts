@@ -21,6 +21,7 @@ export interface ModuleInfo {
   branch: string;
   path: string;
   ignoreOrg: boolean;
+  npmIgnore: boolean|string;
 }
 
 const DEFAULT_MODULE_INFO: Partial<ModuleInfo> = {
@@ -36,6 +37,7 @@ export interface Config {
   pluginClasses: IPluginClass[];
   pluginInstances: Plugin[];
   installMissingAppDeps: boolean;
+  defaultNpmIgnore: boolean|string;
 }
 
 export interface AppConfig {
@@ -52,7 +54,8 @@ const DEFAULT_CONFIG: Partial<Config> = {
   defaultIgnoreOrg: false,
   pluginClasses: [ ],
   pluginInstances: [ ],
-  installMissingAppDeps: false
+  installMissingAppDeps: false,
+  defaultNpmIgnore: true
 };
 
 const CONFIG_FILE_NAME = ".norman.json";
@@ -94,7 +97,7 @@ export function loadConfig(): Config {
     }
 
     // build module list from urls
-    config.modules = config.modules.map(moduleFromConfig.bind(null, config));
+    config.modules = config.modules.map(moduleFromConfig.bind(null, config, configLocation));
 
     if (config.includeModules) {
       let includeModules = Array.isArray(config.includeModules) ? config.includeModules : [ config.includeModules ];
@@ -148,20 +151,8 @@ export function loadConfig(): Config {
 }
 
 
-function moduleFromConfig(inputConfig: any, moduleConfig: any): ModuleInfo {
+function moduleFromConfig(inputConfig: any, configLocation: string, moduleConfig: any): ModuleInfo {
   let branch = moduleConfig.branch || inputConfig.defaultBranch || "master";
-
-  if (typeof moduleConfig === "string") {
-    let fullName = gitUrlParse(moduleConfig).full_name;
-    return Object.assign({}, DEFAULT_MODULE_INFO, {
-      repository: moduleConfig,
-      name: fullName,
-      npmName: npmNameFromPackageName(fullName),
-      branch,
-      path: path.join(inputConfig.modulesDirectory, fullName),
-      ignoreOrg: false
-    }) as ModuleInfo;
-  }
 
   let fullName = gitUrlParse(moduleConfig.repository).full_name;
   if (!moduleConfig.name) {
@@ -176,6 +167,15 @@ function moduleFromConfig(inputConfig: any, moduleConfig: any): ModuleInfo {
 
   if (moduleConfig.ignoreOrg == null) {
     moduleConfig.ignoreOrg = inputConfig.defaultIgnoreOrg != null ? inputConfig.defaultIgnoreOrg : false;
+  }
+
+  if (moduleConfig.npmIgnore == null) {
+    moduleConfig.npmIgnore = inputConfig.defaultNpmIgnore != null ? inputConfig.defaultNpmIgnore : true;
+    if (typeof moduleConfig.npmIgnore === "string") {
+      if (!path.isAbsolute(moduleConfig.npmIgnore)) {
+        moduleConfig.npmIgnore = path.resolve(path.dirname(configLocation), moduleConfig.npmIgnore);
+      }
+    }
   }
 
   if (!moduleConfig.path) {
@@ -230,7 +230,7 @@ function loadModulesFromConfig(file: string): ModuleInfo[] {
   }
 
   // build module list from urls
-  return config.modules.map(moduleFromConfig.bind(null, config));
+  return config.modules.map(moduleFromConfig.bind(null, config, file));
 }
 
 
