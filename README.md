@@ -45,7 +45,7 @@ If the plugin is published as `node-norman-some-plugin` on `npm`, you should add
 Modules from this config are going to be loaded too (taking into account `modulesDirectory` and other module-affecting options from loaded config).
 
 `defaultNpmIgnore` (string or boolean): by default, any files except those in `.git`, `.idea` and `node_modules` directories are synchronized into app's `node_modules`.
-If this options is `true`, `norman` will look for `.npmignore` file in each module, and only synchronize files not ignored by this file.
+If this option is `true`, `norman` will look for `.npmignore` file in each module, and only synchronize files not ignored by this file.
 If `false`, no attempt to use `.npmignore` is done.
 If it is a string, a custom file with ignore rules at the given path is going to be used for all modules.
 Default is `true`.
