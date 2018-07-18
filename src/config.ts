@@ -245,6 +245,8 @@ function registerPlugin(config: Config, moduleName: string): void {
     }
   }
 
+  console.log(`Loading plugin ${moduleName}...`);
+
   let module = require(moduleName);
   if (!module.default) {
     throw new Error(`Failed to import transformer module ${moduleName}: use "export default" to export plugin class`);

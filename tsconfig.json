@@ -14,7 +14,6 @@
     "declarationDir": "declarations"
   },
   "exclude": [
-    "declarations/**/*.*",
-    "libs/**/*.*"
+    "declarations/**/*.*"
   ]
 }
