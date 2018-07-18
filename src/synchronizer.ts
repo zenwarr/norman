@@ -341,7 +341,7 @@ export default class ModuleSynchronizer {
     return { unresolved, resolved };
   }
 
-  protected logConflicts(conflicts: ConflictInfo[]): void {
+  public logConflicts(conflicts: ConflictInfo[]): void {
     for (let conflict of conflicts) {
       if (!conflict.installed) {
         console.log(chalk.red(`CONFLICT: package "${conflict.name}" (${conflict.semver}) is required by module [${conflict.module.name}], but not installed in app`));

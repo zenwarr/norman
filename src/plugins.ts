@@ -118,6 +118,7 @@ export class PackagePlugin extends Plugin {
 
       let conflicts = await this.synchronizer.handleConflicts(module);
       if (conflicts.unresolved.length) {
+        this.synchronizer.logConflicts(conflicts.unresolved);
         console.log(`There are conflicts caused by "npm install" for module ${module.npmName.name}, exiting`);
         process.exit(-1);
       }
