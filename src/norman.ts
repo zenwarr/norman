@@ -1,9 +1,10 @@
 import {loadConfig} from "./config";
 import ModuleSynchronizer from "./synchronizer";
 import ModuleFetcher from "./fetcher";
+import chalk from "chalk";
 
 
-export default async function start(): Promise<void> {
+async function _start(): Promise<void> {
   let config = loadConfig();
 
   let fetcher = new ModuleFetcher(config);
@@ -14,4 +15,14 @@ export default async function start(): Promise<void> {
 
   await fetcher.start();
   await synchronizer.start();
+}
+
+
+export function start(): void {
+  _start().then(() => {
+
+  }, (error: Error) => {
+    console.log(chalk.red(`Error: ${error.message}`));
+    console.error(error);
+  });
 }

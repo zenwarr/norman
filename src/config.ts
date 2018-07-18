@@ -2,7 +2,7 @@ import * as path from "path";
 import * as fs from "fs";
 import * as process from "process";
 import chalk from "chalk";
-import {CoffeeScriptPlugin, Plugin, IPluginClass, PackagePlugin, SourceMapPlugin} from "./plugins";
+import {Plugin, IPluginClass, PackagePlugin, SourceMapPlugin} from "./plugins";
 
 const gitUrlParse = require("git-url-parse");
 
@@ -46,7 +46,7 @@ export interface AppConfig {
 }
 
 
-const DEFAULT_PLUGINS: IPluginClass[]  = [ CoffeeScriptPlugin, SourceMapPlugin, PackagePlugin ];
+const DEFAULT_PLUGINS: IPluginClass[]  = [ SourceMapPlugin, PackagePlugin ];
 
 
 const DEFAULT_CONFIG: Partial<Config> = {
@@ -237,6 +237,12 @@ function loadModulesFromConfig(file: string): ModuleInfo[] {
 function registerPlugin(config: Config, moduleName: string): void {
   if (!moduleName) {
     return;
+  }
+
+  if (moduleName.indexOf("/") < 0 && !moduleName.startsWith("@")) {
+    if (!moduleName.startsWith("node-norman-")) {
+      moduleName = "node-norman-" + moduleName;
+    }
   }
 
   let module = require(moduleName);
