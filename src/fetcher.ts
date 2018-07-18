@@ -31,7 +31,7 @@ export default class ModuleFetcher {
   async fetchModule(module: ModuleInfo) {
     // do we actually need to fetch it again?
     if (fs.existsSync(module.path)) {
-      console.log(`Skip fetching ${module.name}, directory ${module.path} already exists`);
+      console.log(`Skipping fetch for ${module.npmName.name}, directory ${module.path} already exists`);
       return;
     }
 

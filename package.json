@@ -1,6 +1,6 @@
 {
   "name": "node-norman",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -22,13 +22,17 @@
     "@types/chokidar": "^1.7.5",
     "@types/fs-extra": "^5.0.4",
     "@types/node": "^10.5.2",
+    "@types/semver": "^5.5.0",
     "typescript": "^2.9.2"
   },
   "dependencies": {
     "chalk": "^2.4.1",
+    "chokidar": "^2.0.4",
+    "coffee-script": "^1.12.7",
+    "convert-source-map": "^1.5.1",
     "fs-extra": "^6.0.1",
     "git-url-parse": "^9.0.1",
-    "sync-directory": "^2.0.0"
+    "semver": "^5.5.0"
   },
   "bin": {
     "norman": "./norman.js"

@@ -2,6 +2,8 @@ import * as path from "path";
 import * as fs from "fs";
 import * as process from "process";
 import chalk from "chalk";
+import {CoffeeScriptPlugin, Plugin, IPluginClass, PackagePlugin, SourceMapPlugin} from "./plugins";
+
 const gitUrlParse = require("git-url-parse");
 
 export interface ModuleNpmName {
@@ -31,6 +33,9 @@ export interface Config {
   modules: ModuleInfo[];
   defaultIgnoreOrg: boolean;
   app: AppConfig;
+  pluginClasses: IPluginClass[];
+  pluginInstances: Plugin[];
+  installMissingAppDeps: boolean;
 }
 
 export interface AppConfig {
@@ -38,9 +43,16 @@ export interface AppConfig {
   forceModules: string[];
 }
 
+
+const DEFAULT_PLUGINS: IPluginClass[]  = [ CoffeeScriptPlugin, SourceMapPlugin, PackagePlugin ];
+
+
 const DEFAULT_CONFIG: Partial<Config> = {
   modules: [],
-  defaultIgnoreOrg: false
+  defaultIgnoreOrg: false,
+  pluginClasses: [ ],
+  pluginInstances: [ ],
+  installMissingAppDeps: false
 };
 
 const CONFIG_FILE_NAME = ".norman.json";
@@ -105,6 +117,13 @@ export function loadConfig(): Config {
         }
       }
     }
+
+    // register plugins
+    for (let pluginModule of config.plugins || []) {
+      registerPlugin(config, pluginModule);
+    }
+
+    config.pluginClasses = config.pluginClasses.concat(DEFAULT_PLUGINS);
 
     if (!config.app) {
       config.app = { };
@@ -196,6 +215,11 @@ function loadModulesFromConfig(file: string): ModuleInfo[] {
     throw new Error(`Invalid config file ${file}: ${error.message}`);
   }
 
+  // register plugins
+  for (let pluginModule of config.plugins || []) {
+    registerPlugin(config, pluginModule);
+  }
+
   if (!config.modulesDirectory) {
     throw new Error(`No valid "modulesDirectory" option found in configuration file loaded from ${file}`);
   }
@@ -207,4 +231,18 @@ function loadModulesFromConfig(file: string): ModuleInfo[] {
 
   // build module list from urls
   return config.modules.map(moduleFromConfig.bind(null, config));
+}
+
+
+function registerPlugin(config: Config, moduleName: string): void {
+  if (!moduleName) {
+    return;
+  }
+
+  let module = require(moduleName);
+  if (!module.default) {
+    throw new Error(`Failed to import transformer module ${moduleName}: use "export default" to export plugin class`);
+  }
+
+  config.pluginClasses.push(module.default);
 }
