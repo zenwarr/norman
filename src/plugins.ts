@@ -116,12 +116,15 @@ export class PackagePlugin extends Plugin {
 
       await this.fetcher.relinkModule(module);
 
-      if (!await this.synchronizer.handleConflicts(module)) {
+      let conflicts = await this.synchronizer.handleConflicts(module);
+      if (conflicts.unresolved.length) {
         console.log(`There are conflicts caused by "npm install" for module ${module.npmName.name}, exiting`);
         process.exit(-1);
       }
 
-      await this.synchronizer.resyncApp();
+      if (conflicts.resolved.length) {
+        await this.synchronizer.resyncApp();
+      }
     }
 
     return [

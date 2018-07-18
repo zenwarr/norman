@@ -20,6 +20,7 @@ interface ModuleDepInfo {
 }
 
 interface ConflictInfo {
+  module: ModuleInfo;
   name: string;
   version: string;
   semver: string;
@@ -47,12 +48,14 @@ export default class ModuleSynchronizer {
       return;
     }
 
-    let hasConflicts = false;
+    let unresolvedConflicts: ConflictInfo[] = [];
+
     for (let module of this.config.modules) {
-      hasConflicts = hasConflicts || !await this.handleConflicts(module);
+      unresolvedConflicts = unresolvedConflicts.concat((await this.handleConflicts(module)).unresolved);
     }
 
-    if (hasConflicts) {
+    if (unresolvedConflicts.length) {
+      this.logConflicts(unresolvedConflicts);
       console.log(chalk.red(`Modules are not synchronized because of conflicts`));
       return;
     }
@@ -287,14 +290,16 @@ export default class ModuleSynchronizer {
           name: moduleDep.name,
           version: '?',
           semver: moduleDep.semver,
-          installed: false
+          installed: false,
+          module
         });
       } else if (!semver.satisfies(installedDep.version, moduleDep.semver)) {
         conflicts.push({
           name: moduleDep.name,
           version: installedDep.version,
           semver: moduleDep.semver,
-          installed: true
+          installed: true,
+          module
         });
       }
     }
@@ -321,30 +326,28 @@ export default class ModuleSynchronizer {
    * Returns true if all conflicts are resolved, false if there is at least one unresolved conflict.
    * @param module
    */
-  async handleConflicts(module: ModuleInfo): Promise<boolean> {
-    let conflicts: ConflictInfo[] = [ ];
+  async handleConflicts(module: ModuleInfo): Promise<{ resolved: ConflictInfo[], unresolved: ConflictInfo[] }> {
+    let unresolved: ConflictInfo[] = [ ];
+    let resolved: ConflictInfo[] = [ ];
 
     for (let conflict of await this.findModuleConflicts(module)) {
       if (!await this.resolveConflict(conflict, module)) {
-        conflicts.push(conflict);
+        unresolved.push(conflict);
+      } else {
+        resolved.push(conflict);
       }
     }
 
-    if (conflicts.length) {
-      this.logConflicts(conflicts, module);
-      return false;
-    }
-
-    return true;
+    return { unresolved, resolved };
   }
 
-  protected logConflicts(conflicts: ConflictInfo[], module: ModuleInfo): void {
+  protected logConflicts(conflicts: ConflictInfo[]): void {
     for (let conflict of conflicts) {
       if (!conflict.installed) {
-        console.log(chalk.red(`CONFLICT: package "${conflict.name}" (${conflict.semver}) is required by module [${module.name}], but not installed in app`));
+        console.log(chalk.red(`CONFLICT: package "${conflict.name}" (${conflict.semver}) is required by module [${conflict.module.name}], but not installed in app`));
       } else {
         console.log(chalk.red(
-            `CONFLICT: package "${conflict.name}" is required by module [${module.name}], but app has incompatible version installed.
+            `CONFLICT: package "${conflict.name}" is required by module [${conflict.module.name}], but app has incompatible version installed.
           Required: ${conflict.semver}, installed: ${conflict.version}`
         ));
       }
