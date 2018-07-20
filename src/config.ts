@@ -22,11 +22,15 @@ export interface ModuleInfo {
   path: string;
   ignoreOrg: boolean;
   npmIgnore: boolean|string;
+  fetchDone: boolean;
+  relink: boolean;
 }
 
 const DEFAULT_MODULE_INFO: Partial<ModuleInfo> = {
   npmInstall: true,
-  buildCommands: []
+  buildCommands: [],
+  fetchDone: false,
+  relink: true
 };
 
 export interface Config {
@@ -177,6 +181,8 @@ function moduleFromConfig(inputConfig: any, configLocation: string, moduleConfig
       }
     }
   }
+
+  moduleConfig.relink = moduleConfig.relink == null ? true : moduleConfig.relink;
 
   if (!moduleConfig.path) {
     moduleConfig.path = path.join(inputConfig.modulesDirectory, moduleConfig.ignoreOrg ? moduleConfig.npmName.pkg : fullName);

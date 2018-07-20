@@ -66,6 +66,8 @@ If directory where this repository should be cloned already exists, the reposito
 
 `module.npmIgnore` (string): overrides `defaultNpmIgnore` value for the module.
 
+`module.relink` (boolean): if `false`, do not relink another packages into this module's `node_modules`.
+
 `app` (object): Object containing app configuration.
 Its properties are documented below under `app.*` keys.
 

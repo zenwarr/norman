@@ -26,6 +26,14 @@ export default class ModuleFetcher {
         console.error(`Failed to relink module: ${error.message}`);
       }
     }
+
+    for (let module of this.config.modules) {
+      try {
+        await this.buildModule(module);
+      } catch (error) {
+        console.error(`Failde to build module: ${error.message}`);
+      }
+    }
   }
 
   async fetchModule(module: ModuleInfo) {
@@ -35,23 +43,19 @@ export default class ModuleFetcher {
       return;
     }
 
+    module.fetchDone = true;
+
     await utils.runCommand("git", [ "clone", module.repository, "-b", module.branch, module.path ]);
 
     if (module.npmInstall) {
       await utils.runCommand("npm", [ "install" ], {
         cwd: module.path
       });
-
-      for (let buildCommand of module.buildCommands) {
-        await utils.runCommand("npm", [ "run", buildCommand ], {
-          cwd: module.path
-        });
-      }
     }
   }
 
   async relinkModule(module: ModuleInfo) {
-    if (!module.npmInstall) {
+    if (!module.npmInstall || !module.relink) {
       // we did not install node_modules, so no need to relink it
       return;
     }
@@ -68,6 +72,16 @@ export default class ModuleFetcher {
         if (error.code !== "ENOENT") {
           throw error;
         }
+      }
+    }
+  }
+
+  async buildModule(module: ModuleInfo) {
+    if (module.npmInstall && module.fetchDone) {
+      for (let buildCommand of module.buildCommands) {
+        await utils.runCommand("npm", [ "run", buildCommand ], {
+          cwd: module.path
+        });
       }
     }
   }
