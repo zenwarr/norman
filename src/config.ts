@@ -1,8 +1,8 @@
 import * as path from "path";
-import * as fs from "fs";
+import * as fs from "fs-extra";
 import * as process from "process";
 import chalk from "chalk";
-import {Plugin, IPluginClass, PackagePlugin, SourceMapPlugin} from "./plugins";
+import {IPluginClass, PackagePlugin, Plugin, SourceMapPlugin} from "./plugins";
 
 const gitUrlParse = require("git-url-parse");
 
@@ -15,7 +15,7 @@ export interface ModuleNpmName {
 export interface ModuleInfo {
   name: string;
   npmName: ModuleNpmName;
-  repository: string;
+  repository: string|null;
   npmInstall: boolean;
   buildCommands: string[];
   branch: string;
@@ -23,30 +23,29 @@ export interface ModuleInfo {
   ignoreOrg: boolean;
   npmIgnore: boolean|string;
   fetchDone: boolean;
+  installDone: boolean;
   relink: boolean;
+  syncTargets: string[];
+  prevHash?: string;
+  liveDeps: boolean;
 }
 
 const DEFAULT_MODULE_INFO: Partial<ModuleInfo> = {
   npmInstall: true,
   buildCommands: [],
   fetchDone: false,
+  installDone: false,
   relink: true
 };
 
 export interface Config {
+  mainConfigDir: string;
   modulesDirectory: string;
   modules: ModuleInfo[];
   defaultIgnoreOrg: boolean;
-  app: AppConfig;
   pluginClasses: IPluginClass[];
   pluginInstances: Plugin[];
-  installMissingAppDeps: boolean;
   defaultNpmIgnore: boolean|string;
-}
-
-export interface AppConfig {
-  home: string;
-  forceModules: string[];
 }
 
 
@@ -58,30 +57,35 @@ const DEFAULT_CONFIG: Partial<Config> = {
   defaultIgnoreOrg: false,
   pluginClasses: [ ],
   pluginInstances: [ ],
-  installMissingAppDeps: false,
   defaultNpmIgnore: true
 };
 
 const CONFIG_FILE_NAME = ".norman.json";
 
 
-export function loadConfig(): Config {
-  const loadFromDir = (dir: string): Config => {
+export function loadConfig(configPath: string|null): Config {
+  const findConfigForDir = (dir: string): string => {
     if (!dir || dir === "/" || dir === ".") {
       throw new Error(`No ${CONFIG_FILE_NAME} found in directory tree`);
     }
 
     let configLocation = path.join(dir, CONFIG_FILE_NAME);
-
-    let rawConfig: string;
-    try {
-      rawConfig = fs.readFileSync(configLocation, {
-        encoding: "utf-8"
-      });
-    } catch (error) {
-      // no file found, go level up
-      return loadFromDir(path.dirname(dir));
+    if (fs.existsSync(configLocation)) {
+      return configLocation;
+    } else {
+      return findConfigForDir(path.dirname(dir));
     }
+  };
+
+
+  const loadConfig = (configLocation: string): Config => {
+    console.log(`Loading config file from ${configLocation}`);
+
+    let configLocationDir = path.dirname(configLocation);
+
+    let rawConfig = fs.readFileSync(configLocation, {
+      encoding: "utf-8"
+    });
 
     let config: any;
     try {
@@ -91,13 +95,15 @@ export function loadConfig(): Config {
       throw new Error(`Invalid config file ${configLocation}: ${error.message}`);
     }
 
+    config.mainConfigDir = configLocationDir;
+
     if (!config.modulesDirectory) {
       throw new Error(`No valid "modulesDirectory" option found in configuration file loaded from ${configLocation}`);
     }
 
     // make modulesDirectory absolute
     if (!path.isAbsolute(config.modulesDirectory)) {
-      config.modulesDirectory = path.resolve(dir, config.modulesDirectory);
+      config.modulesDirectory = path.resolve(configLocationDir, config.modulesDirectory);
     }
 
     // build module list from urls
@@ -107,7 +113,7 @@ export function loadConfig(): Config {
       let includeModules = Array.isArray(config.includeModules) ? config.includeModules : [ config.includeModules ];
       for (let includeConfig of includeModules) {
         if (!path.isAbsolute(includeConfig)) {
-          includeConfig = path.resolve(dir, includeConfig);
+          includeConfig = path.resolve(configLocationDir, includeConfig);
         }
         try {
           let extraModules = loadModulesFromConfig(includeConfig).filter(extraModule => {
@@ -125,6 +131,51 @@ export function loadConfig(): Config {
       }
     }
 
+    // add default app module
+    if (config.modules.find((module: ModuleInfo) => module.path === config.mainConfigDir) == null) {
+      let moduleInfo: ModuleInfo;
+
+      let packageJsonPath = path.join(config.mainConfigDir, "package.json");
+      if (fs.existsSync(packageJsonPath)) {
+        let pkg = fs.readJSONSync(packageJsonPath);
+
+        let pkgName= pkg.name;
+        let npmName: ModuleNpmName;
+        if (pkgName.indexOf("/") >= 0) {
+          npmName = {
+            org: pkgName.slice(0, pkgName.indexOf("/")),
+            pkg: pkgName.slice(pkgName.indexOf("/") + 1),
+            name: pkgName
+          }
+        } else {
+          npmName = {
+            org: "",
+            pkg: pkgName,
+            name: pkgName
+          }
+        }
+
+        moduleInfo = {
+          name: pkg.name,
+          npmName,
+          repository: null,
+          npmInstall: true,
+          buildCommands: [],
+          branch: config.defaultBranch,
+          path: config.mainConfigDir,
+          ignoreOrg: config.defaultIgnoreOrg,
+          npmIgnore: config.defaultNpmIgnore,
+          fetchDone: true,
+          installDone: false,
+          relink: false,
+          syncTargets: [],
+          liveDeps: true
+        };
+
+        config.modules.push(moduleInfo);
+      }
+    }
+
     // register plugins
     for (let pluginModule of config.plugins || []) {
       registerPlugin(config, pluginModule);
@@ -132,26 +183,18 @@ export function loadConfig(): Config {
 
     config.pluginClasses = config.pluginClasses.concat(DEFAULT_PLUGINS);
 
-    if (!config.app) {
-      config.app = { };
-    }
-
-    if (!config.app.home) {
-      // consider this directory should be a root application directory
-      config.app.home = dir;
-      console.log(chalk.yellow(`You have no "app" or "app.home" in your ".norman.json" file, considering "${dir}" to be home`));
-    } else if (!path.isAbsolute(config.app.home)) {
-      config.app.home = path.resolve(dir, config.app.home);
-    }
-
-    if (!config.app.forceModules) {
-      config.app.forceModules = [ ];
-    }
-
     return config;
   };
 
-  return loadFromDir(process.cwd());
+
+  if (configPath) {
+    if (fs.statSync(configPath).isDirectory()) {
+      configPath = path.join(configPath, CONFIG_FILE_NAME);
+    }
+    return loadConfig(configPath);
+  } else {
+    return loadConfig(findConfigForDir(process.cwd()));
+  }
 }
 
 
@@ -189,6 +232,8 @@ function moduleFromConfig(inputConfig: any, configLocation: string, moduleConfig
   } else if (!path.isAbsolute(moduleConfig.path)) {
     throw new Error(`Path for module ${fullName} has to be absolute: ${moduleConfig.path}`);
   }
+
+  moduleConfig.liveDeps = true;
 
   return Object.assign({}, DEFAULT_MODULE_INFO, moduleConfig);
 }

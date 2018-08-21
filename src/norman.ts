@@ -1,25 +1,173 @@
-import {loadConfig} from "./config";
-import ModuleSynchronizer from "./synchronizer";
+import {Config, loadConfig, ModuleInfo} from "./config";
+import {AppSynchronizer} from "./synchronizer";
 import ModuleFetcher from "./fetcher";
 import chalk from "chalk";
+import * as path from "path";
+import {ArgumentParser} from "argparse";
+import {LocalNpmServer} from "./server";
 
 
-async function _start(): Promise<void> {
-  let config = loadConfig();
+export type Arguments = {
+  config: string|null;
+} & ({
+  subCommand: "sync";
+  buildDeps: boolean;
+  paths: string[];
+} | {
+  subCommand: "start",
+  watch: boolean;
+});
 
-  let fetcher = new ModuleFetcher(config);
-  let synchronizer = new ModuleSynchronizer(config);
 
-  // init plugins
-  config.pluginInstances = config.pluginClasses.map(pluginClass => new pluginClass(config, fetcher, synchronizer));
+export class Norman {
+  private _fetcher: ModuleFetcher|null = null;
+  private _server: LocalNpmServer|null = null;
+  private _appSynchronizer: AppSynchronizer|null = null;
+  private _config: Config|null = null;
+  private _args: Arguments|null = null;
 
-  await fetcher.start();
-  await synchronizer.start();
+
+  get args(): Arguments {
+    return this._args!;
+  }
+
+
+  get moduleFetcher(): ModuleFetcher {
+    if (!this._fetcher) {
+      throw new Error("Fetcher instance is not yet initialized");
+    }
+    return this._fetcher;
+  }
+
+
+  get appSynchronizer(): AppSynchronizer {
+    if (!this._appSynchronizer) {
+      throw new Error("App synhronizer instance is not yet initialized");
+    }
+    return this._appSynchronizer;
+  }
+
+
+  get localNpmServer(): LocalNpmServer {
+    if (!this._server) {
+      throw new Error("Local npm server is not yet initialized");
+    }
+    return this._server;
+  }
+
+
+  get config(): Config {
+    if (!this._config) {
+      throw new Error("Config is not yet loaded");
+    }
+    return this._config;
+  }
+
+
+  getModuleInfo(moduleName: string): ModuleInfo|null {
+    return this.config.modules.find(module => module.npmName.name === moduleName || module.name === moduleName) || null;
+  }
+
+
+  async start() {
+    let argparser = new ArgumentParser({
+      addHelp: true
+    });
+    argparser.addArgument([ "--config", "-c" ], {
+      help: "Path to config file or a directory containing config file named .norman.json"
+    });
+
+    let subparsers = argparser.addSubparsers({
+      title: "Subcommand",
+      dest: "subCommand"
+    });
+
+    let syncParser = subparsers.addParser("sync", {
+      help: "Synchronizes a local module"
+    });
+    syncParser.addArgument("--build-deps", {
+      help: "Builds dependent local modules before synchronization",
+      action: "storeTrue",
+      defaultValue: false,
+      dest: "buildDeps"
+    });
+    syncParser.addArgument("paths", {
+      help: "Path to module to synchronize",
+      nargs: "*"
+    });
+
+    let initParser = subparsers.addParser("start", {
+      help: "Fetches and initializes all local modules"
+    });
+    initParser.addArgument([ "--watch", "-w" ], {
+      help: "Watch for changes in local modules and automatically synchronize dependent modules",
+      action: "storeTrue",
+      defaultValue: false
+    });
+
+    let args: Arguments = argparser.parseArgs();
+    this._args = args;
+
+    if (args.config) {
+      if (!path.isAbsolute(args.config)) {
+        args.config = path.resolve(process.cwd(), args.config);
+      }
+    }
+
+    if (args.subCommand === "sync" && args.paths) {
+      for (let q = 0; q < args.paths.length; ++q) {
+        if (!path.isAbsolute(args.paths[q])) {
+          args.paths[q] = path.resolve(process.cwd(), args.paths[q]);
+        }
+      }
+    }
+
+    console.log('args: ', args);
+
+    this._config = loadConfig(args.config);
+
+    this._server = new LocalNpmServer(this);
+    this._fetcher = new ModuleFetcher(this);
+
+    await this._server.start();
+    await this._fetcher.start();
+
+    if (args.subCommand === "start") {
+      if (args.watch) {
+        this._appSynchronizer = new AppSynchronizer(this);
+        await this._appSynchronizer.start();
+      }
+    } else if (args.subCommand === "sync") {
+      this._appSynchronizer = new AppSynchronizer(this);
+
+      let localModules = args.paths.map((argPath): ModuleInfo => {
+        let localModule = this.config.modules.find(module => {
+          return path.normalize(module.path) === path.normalize(argPath);
+        });
+
+        if (!localModule) {
+          console.log(chalk.red(`No local module found at ${argPath}`));
+          process.exit(-1);
+          throw new Error();
+        }
+
+        return localModule;
+      });
+
+      for (let localModule of localModules) {
+        await this.appSynchronizer.syncModule(localModule);
+      }
+    }
+
+    await this._server.stop();
+  }
 }
 
 
 export function start(): void {
-  _start().then(() => {
+  let norman = new Norman();
+
+  norman.start().then(() => {
 
   }, (error: Error) => {
     console.log(chalk.red(`Error: ${error.message}`));

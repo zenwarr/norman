@@ -4,5 +4,4 @@ node_modules
 *.js
 *.js.map
 declarations
-!/norman.js
 todo.md

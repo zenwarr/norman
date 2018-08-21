@@ -108,3 +108,10 @@ By default, `norman` transforms source maps it synchronizes to point to location
 
 Currently there is only one plugin, `node-norman-coffee-script`.
 It transpiles `.coffee` files on-the-fly (you are going to have `.coffee` files in source directory and compiled `.js` and `js.map` files in `APP/node_modules` (coffee 1.x is used).
+
+# Command-line interface reference
+
+`--config`: Path to config file or a directory containing config file named `.norman.json`.
+`--watch`: Watches for changes in local modules and automatically synchronizes all modules.
+`sync ~/projects/myapp/moduleA`
+`sync ~/projects/myapp/moduleA --build-deps`

@@ -1,96 +1,68 @@
-import {Config, ModuleInfo} from "./config";
 import * as path from "path";
 import * as fs from "fs-extra";
-import chalk from "chalk";
-import * as chokidar from "chokidar";
-import * as semver from "semver";
 import * as utils from "./utils";
-
-const ignore = require("ignore");
-
-
-interface DepInfo {
-  name: string;
-  version: string;
-}
-
-interface ModuleDepInfo {
-  name: string;
-  semver: string;
-}
-
-interface ConflictInfo {
-  module: ModuleInfo;
-  name: string;
-  version: string;
-  semver: string;
-  installed: boolean;
-}
+import {Config, ModuleInfo} from "./config";
+import {Norman} from "./norman";
+import * as chokidar from "chokidar";
+import chalk from "chalk";
+import ignore from "ignore";
 
 
 const IGNORE_REGEXPS = [
   /node_modules$/,
   /.git$/,
-  /.idea$/
+  /.idea$/,
+  /\/.npmrc-norman-backup$/,
+  /\/package-lock.norman-backup.json$/
 ];
 
 
-export default class ModuleSynchronizer {
-  constructor(protected config: Config) {
+export class AppSynchronizer {
+  constructor(protected norman: Norman) {
 
   }
 
+
+  get config(): Config {
+    return this.norman.config;
+  }
+
+
+  protected clearSyncTargets(): void {
+    for (let localModule of this.config.modules) {
+      localModule.syncTargets = [];
+    }
+  }
+
+
+  protected updateSyncTargets(): void {
+    let syncTargets = 0,
+        syncingModules: string[] = [];
+
+    for (let localModule of this.config.modules) {
+      localModule.syncTargets = [ ];
+      for (let module of this.config.modules) {
+        if (module.liveDeps && this.moduleDependsOn(module, localModule)) {
+          localModule.syncTargets.push(path.join(module.path, "node_modules", localModule.npmName.name));
+          ++syncTargets;
+
+          console.log(`${localModule.npmName.name} -> ${localModule.syncTargets[localModule.syncTargets.length - 1]}`);
+
+          if (syncingModules.indexOf(localModule.npmName.name) < 0) {
+            syncingModules.push(localModule.npmName.name);
+          }
+        }
+      }
+    }
+
+    console.log(chalk.green(`sync targets updated, ${syncTargets} targets in modules ${syncingModules.join(", ")}`));
+  }
+
+
   async start(): Promise<void> {
+    this.updateSyncTargets();
+
     let watchingCount = 0;
-
-    if (!fs.existsSync(path.join(this.config.app.home, "node_modules"))) {
-      console.log(chalk.red(`No "node_modules" directory exist in app directory, run "npm install" before starting norman`));
-      return;
-    }
-
-    let unresolvedConflicts: ConflictInfo[] = [];
-
-    for (let module of this.config.modules) {
-      unresolvedConflicts = unresolvedConflicts.concat((await this.handleConflicts(module)).unresolved);
-    }
-
-    if (unresolvedConflicts.length) {
-      this.logConflicts(unresolvedConflicts);
-      console.log(chalk.red(`Modules are not synchronized because of conflicts`));
-      return;
-    }
-
-    // set up ignores
-    for (let module of this.config.modules) {
-      let ignorePath: string;
-      if (module.npmIgnore === true) {
-        // try to load .npmignore file from the package and use it
-        ignorePath = path.join(module.path, ".npmignore");
-        if (!fs.existsSync(ignorePath)) {
-          // keep silence
-          continue;
-        }
-      } else if (typeof module.npmIgnore === "string") {
-        // use custom ignore file instead
-        ignorePath = module.npmIgnore;
-      } else {
-        continue;
-      }
-
-      try {
-        console.log(`loading ignore rules from ${ignorePath}`);
-        let ignoreLines = fs.readFileSync(ignorePath, { encoding: "utf-8" }).split("\n");
-
-        let ignoreInstance = ignore();
-        for (let ignoreLine of ignoreLines) {
-          ignoreInstance.add(ignoreLine);
-        }
-
-        this.ignoreInstances[module.name] = ignoreInstance;
-      } catch (error) {
-        throw new Error(`Failed to load custom ignore file for module ${module.npmName.name}: ${error.message}`);
-      }
-    }
 
     for (let module of this.config.modules) {
       if (this.watchModule(module)) {
@@ -98,24 +70,40 @@ export default class ModuleSynchronizer {
       }
     }
 
-    if (!watchingCount) {
-      console.log(chalk.yellow(`No modules were synchronized for app at "${this.config.app.home}". Use "app.forceModules" to list required modules or run "npm install" in app directory`));
-    } else {
-      console.log(chalk.green(`Watching for changes in ${watchingCount} modules...`));
-    }
+    console.log(chalk.green(`Watching for changes in ${watchingCount} modules`));
   }
 
-  initialSyncDone(module: ModuleInfo) {
-    return this.initedModules.indexOf(module.name) >= 0;
+
+  protected moduleDependsOn(module: ModuleInfo, dep: ModuleInfo): boolean {
+    return fs.existsSync(path.join(module.path, "node_modules", dep.npmName.name));
   }
 
-  protected initedModules: string[] = [ ];
-  protected watchers: { [name: string]: chokidar.FSWatcher|undefined } = { };
-  protected ignoreInstances: { [name: string]: any } = { };
 
   protected async copyFile(module: ModuleInfo, moduleAppPath: string, sourceFilePath: string): Promise<string[]> {
     let relpath = path.relative(module.path, sourceFilePath);
     let targetFilePath = path.join(moduleAppPath, relpath);
+
+    if (relpath == "package.json") {
+      console.log(chalk.green(`Dependencies of module ${module.npmName.name} has changed, reinstalling it in dependent modules...`));
+
+      let hasDependants = false;
+
+      this.clearSyncTargets();
+
+      try {
+        // re-install this module in all modules that depend on it
+        for (let localModule of this.config.modules) {
+          if (localModule.liveDeps && this.moduleDependsOn(localModule, module)) {
+            hasDependants = true;
+            await this.norman.localNpmServer.installLocalModule(localModule, module);
+          }
+        }
+      } finally {
+        this.updateSyncTargets();
+      }
+
+      return [ ];
+    }
 
     let loadedContent: string|undefined = undefined;
     for (let plugin of this.config.pluginInstances) {
@@ -137,6 +125,14 @@ export default class ModuleSynchronizer {
     return [ targetFilePath ];
   }
 
+  initialSyncDone(module: ModuleInfo) {
+    return this.initedModules.indexOf(module.name) >= 0;
+  }
+
+  protected initedModules: string[] = [ ];
+  protected watchers: { [name: string]: chokidar.FSWatcher|undefined } = { };
+  protected ignoreInstances: { [name: string]: any } = { };
+
   protected isIgnored(module: ModuleInfo, sourceFilePath: string): boolean {
     if (this.ignoreInstances[module.name]) {
       return this.ignoreInstances[module.name].ignores(sourceFilePath);
@@ -144,49 +140,56 @@ export default class ModuleSynchronizer {
     return false;
   }
 
-  protected async onAddFile(module: ModuleInfo, moduleAppPath: string, sourceFilePath: string) {
+  protected async onAddFile(module: ModuleInfo, sourceFilePath: string) {
     if (this.isIgnored(module, sourceFilePath)) {
       return;
     }
 
     let syncDone = this.initialSyncDone(module);
-    let targetFiles = await this.copyFile(module, moduleAppPath, sourceFilePath);
-    if (syncDone) {
-      this.logChange(module, "NEW", sourceFilePath, moduleAppPath, targetFiles);
+    for (let syncTarget of module.syncTargets || []) {
+      let targetFiles = await this.copyFile(module, syncTarget, sourceFilePath);
+      if (syncDone) {
+        this.logChange(module, "NEW", sourceFilePath, syncTarget, targetFiles);
+      }
     }
   }
 
-  protected async onChangeFile(module: ModuleInfo, moduleAppPath: string, sourceFilePath: string) {
+  protected async onChangeFile(module: ModuleInfo, sourceFilePath: string) {
     if (this.isIgnored(module, sourceFilePath)) {
       return;
     }
 
     let syncDone = this.initialSyncDone(module);
-    let targetFiles = await this.copyFile(module, moduleAppPath, sourceFilePath);
-    if (syncDone) {
-      this.logChange(module, "UPD", sourceFilePath, moduleAppPath, targetFiles);
+    for (let syncTarget of module.syncTargets || []) {
+      let targetFiles = await this.copyFile(module, syncTarget, sourceFilePath);
+      if (syncDone) {
+        this.logChange(module, "UPD", sourceFilePath, syncTarget, targetFiles);
+      }
     }
   }
 
-  protected async onRemoveFile(module: ModuleInfo, moduleAppPath: string, sourceFilePath: string) {
+  protected async onRemoveFile(module: ModuleInfo, sourceFilePath: string) {
     if (this.isIgnored(module, sourceFilePath)) {
       return;
     }
 
     let relpath = path.relative(module.path, sourceFilePath);
-    let targetFilePath = path.join(moduleAppPath, relpath);
 
-    for (let plugin of this.config.pluginInstances) {
-      if (plugin.matches(sourceFilePath, module)) {
-        plugin.clean(sourceFilePath, targetFilePath, module);
+    for (let syncTarget of module.syncTargets || []) {
+      let targetFilePath = path.join(syncTarget, relpath);
+
+      for (let plugin of this.config.pluginInstances) {
+        if (plugin.matches(sourceFilePath, module)) {
+          plugin.clean(sourceFilePath, targetFilePath, module);
+        }
       }
-    }
 
-    fs.unlinkSync(targetFilePath);
-    this.logChange(module, "DEL", sourceFilePath, moduleAppPath, targetFilePath);
+      fs.unlinkSync(targetFilePath);
+      this.logChange(module, "DEL", sourceFilePath, syncTarget, targetFilePath);
+    }
   }
 
-  protected async onAddDir(module: ModuleInfo, moduleAppPath: string, sourceFilePath: string) {
+  protected async onAddDir(module: ModuleInfo, sourceFilePath: string) {
     if (this.isIgnored(module, sourceFilePath)) {
       return;
     }
@@ -196,21 +199,25 @@ export default class ModuleSynchronizer {
       return;
     }
 
-    let targetFilePath = path.join(moduleAppPath, relpath);
-    let fileMode = fs.statSync(sourceFilePath).mode;
-    fs.mkdirpSync(targetFilePath);
-    fs.chmodSync(targetFilePath, fileMode);
-    this.logChange(module, "NEW", sourceFilePath, moduleAppPath, targetFilePath);
+    for (let syncTarget of module.syncTargets || []) {
+      let targetFilePath = path.join(syncTarget, relpath);
+      let fileMode = fs.statSync(sourceFilePath).mode;
+      fs.mkdirpSync(targetFilePath);
+      fs.chmodSync(targetFilePath, fileMode);
+      this.logChange(module, "NEW", sourceFilePath, syncTarget, targetFilePath);
+    }
   }
 
-  protected async onRemoveDir(module: ModuleInfo, moduleAppPath: string, sourceFilePath: string) {
+  protected async onRemoveDir(module: ModuleInfo, sourceFilePath: string) {
     if (this.isIgnored(module, sourceFilePath)) {
       return;
     }
 
-    let targetFilePath = path.join(moduleAppPath, path.relative(module.path, sourceFilePath));
-    fs.removeSync(targetFilePath);
-    this.logChange(module, "DEL", sourceFilePath, moduleAppPath, targetFilePath);
+    for (let syncTarget of module.syncTargets || []) {
+      let targetFilePath = path.join(syncTarget, path.relative(module.path, sourceFilePath));
+      fs.removeSync(targetFilePath);
+      this.logChange(module, "DEL", sourceFilePath, syncTarget, targetFilePath);
+    }
   }
 
   protected logChange(module: ModuleInfo, event: string, sourceFilePath: string, moduleAppPath: string, targetFiles: string|string[]): void {
@@ -223,186 +230,156 @@ export default class ModuleSynchronizer {
     }
   }
 
-  protected getAppInstalledDeps(): DepInfo[] {
-    const getDepsFromDir = (dir: string): DepInfo[] => {
-      let filenames = fs.readdirSync(dir, { encoding: "utf-8" }) as string[];
 
-      let result: DepInfo[] = [];
-
-      for (let filename of filenames) {
-        let filePath = path.join(dir, filename);
-        if (filename.startsWith(".") || !fs.statSync(filePath).isDirectory()) {
-          continue;
-        }
-
-        if (filename.startsWith("@")) {
-          result = result.concat(getDepsFromDir(filePath));
-          continue;
-        }
-
-        try {
-          let pkgPath = require.resolve(path.join(dir, filename, "package.json"));
-          delete require.cache[pkgPath];
-          let pkg = require(pkgPath);
-          result.push({
-            name: pkg.name,
-            version: pkg.version
-          });
-        } catch (error) {
-          // do nothing
-        }
-      }
-
-      return result;
-    };
-
-    return getDepsFromDir(path.join(this.config.app.home, "node_modules"));
-  }
-
-  protected getModuleDeps(module: ModuleInfo): ModuleDepInfo[] {
-    try {
-      let pkgPath = require.resolve(path.join(module.path, "package.json"));
-      delete require.cache[pkgPath];
-      let pkg = require(pkgPath);
-      return Object.keys(pkg.dependencies || { }).map(name => ({
-        name,
-        semver: pkg.dependencies[name]
-      }));
-    } catch (error) {
-      console.log(chalk.yellow(`Failed to get dependencies for module [${module.name}]: ${error.message}`));
-      return [];
-    }
-  }
-
-  protected findModuleConflicts(module: ModuleInfo, cachedAppDeps?: DepInfo[]): ConflictInfo[] {
-    let appDeps = cachedAppDeps || this.getAppInstalledDeps();
-
-    let moduleDeps = this.getModuleDeps(module).filter(dep => {
-      return !dep.name.startsWith("@types/") &&
-          this.config.modules.find(mod => mod.npmName.name === dep.name) == null;
+  protected watchModule(module: ModuleInfo, logSkipped: boolean = true): boolean {
+    let watcher = chokidar.watch(module.path, {
+      ignored: IGNORE_REGEXPS,
+      followSymlinks: false,
+      awaitWriteFinish: true,
+      atomic: true,
+      ignoreInitial: true
     });
 
-    let conflicts: ConflictInfo[] = [];
-    for (let moduleDep of moduleDeps) {
-      let installedDep = appDeps.find(dep => dep.name === moduleDep.name);
-      if (!installedDep) {
-        conflicts.push({
-          name: moduleDep.name,
-          version: '?',
-          semver: moduleDep.semver,
-          installed: false,
-          module
-        });
-      } else if (!semver.satisfies(installedDep.version, moduleDep.semver)) {
-        conflicts.push({
-          name: moduleDep.name,
-          version: installedDep.version,
-          semver: moduleDep.semver,
-          installed: true,
-          module
-        });
+    watcher.on("add", this.onAddFile.bind(this, module));
+    watcher.on("change", this.onChangeFile.bind(this, module));
+    watcher.on("unlink", this.onRemoveFile.bind(this, module));
+    watcher.on("addDir", this.onAddDir.bind(this, module));
+    watcher.on("unlinkDir", this.onRemoveDir.bind(this, module));
+    watcher.on("error", error => console.log(chalk.red(`watcher error: ${error.message}`)));
+    watcher.on("ready", () => this.initedModules.push(module.name));
+
+    this.watchers[module.name] = watcher;
+
+    return true;
+  }
+
+
+  /**
+   * - Enumerate local dependencies of the module
+   * - For each dependency, do the following:
+   * -   Build the module if `--build-deps` is true.
+   * -   If the module is listed in `package.json`, but not installed, remember to run `npm install` in the end and go to the next module.
+   * -   If the module is installed, check if it is actual:
+   * -     Compare dependencies of the installed module with dependencies of the actual module.
+   * -       If dependencies match, just copy source files to installed module and proceed to the next module.
+   * -       If dependencies do not match, remove the installed module and remember to run `npm install`.
+   * @param localModule
+   */
+  async syncModule(localModule: ModuleInfo, alreadyBuilt?: string[]): Promise<void> {
+    console.log(chalk.green(`SYNC MODULE: ${localModule.npmName.name}`));
+
+    if (!alreadyBuilt) {
+      alreadyBuilt = [];
+    }
+
+    let localDependencies: ModuleInfo[] = [];
+
+    let dependencies = utils.getPackageDeps(localModule.path);
+    for (let dep of dependencies) {
+      let localDependency = this.norman.getModuleInfo(dep);
+      if (localDependency) {
+        localDependencies.push(localDependency);
       }
     }
 
-    return conflicts;
+    await this.norman.localNpmServer.walkDependencyTree(localDependencies, async module => {
+      if (this.norman.args.subCommand === "sync" && this.norman.args.buildDeps) {
+        for (let buildCommand of module.buildCommands) {
+          if (alreadyBuilt!.find(m => m === module.npmName.name)) {
+            return;
+          }
+
+          await this.syncModule(module, alreadyBuilt);
+
+          await utils.runCommand("npm", [ "run", buildCommand ], {
+            cwd: module.path
+          });
+
+          alreadyBuilt!.push(module.npmName.name);
+        }
+      }
+    });
+
+    let runInstall = false;
+
+    await this.norman.localNpmServer.walkDependencyTree(localDependencies, async module => {
+      // check if module is installed into this module node_modules
+      let installedPath = path.join(localModule.path, "node_modules", module.npmName.name);
+      if (!fs.existsSync(installedPath)) {
+        console.log(`Reinstalling dependencies because module ${module.npmName.name} is not installed`);
+        runInstall = true;
+        return;
+      }
+
+      // get deps of the installed modules
+      let installedSubDeps = utils.getPackageDeps(installedPath, false).sort();
+      let actualSubDeps = utils.getPackageDeps(module.path, false).sort();
+
+      let depsEqual = installedSubDeps.length === actualSubDeps.length && installedSubDeps.every((dep, q) => dep === actualSubDeps[q]);
+      if (depsEqual) {
+        await this.painlessSyncInto(module, installedPath);
+      } else {
+        console.log(`Reinstalling dependencies because module ${module.npmName.name} dependencies have changed`);
+        fs.removeSync(installedPath);
+        runInstall = true;
+      }
+    });
+
+    if (runInstall) {
+      await this.norman.localNpmServer.installModuleDeps(localModule);
+    }
+
+    console.log(chalk.green(`SYNC DONE: ${localModule.npmName.name}`));
   }
 
-  protected async resolveConflict(conflict: ConflictInfo, module: ModuleInfo): Promise<boolean> {
-    if (!conflict.installed && this.config.installMissingAppDeps) {
-      // module is missing, we can fix that
-      let packageSpec = `${conflict.name}@${conflict.semver}`;
-      console.log(chalk.yellow(`RESOLVE CONFLICT: installing "${packageSpec}" into app directory (required by [${module.name}])`));
-      await utils.runCommand("npm", [ "install", packageSpec, "--no-save" ], {
-        cwd: this.config.app.home,
-        env: process.env
-      });
+
+  protected isPainlessIgnored(module: ModuleInfo, filepath: string): boolean {
+    if (this.isIgnored(module, filepath)) {
       return true;
+    }
+
+    for (let ignoreRe of IGNORE_REGEXPS) {
+      if (filepath.match(ignoreRe)) {
+        return true;
+      }
     }
 
     return false;
   }
 
-  /**
-   * Returns true if all conflicts are resolved, false if there is at least one unresolved conflict.
-   * @param module
-   */
-  async handleConflicts(module: ModuleInfo): Promise<{ resolved: ConflictInfo[], unresolved: ConflictInfo[] }> {
-    let unresolved: ConflictInfo[] = [ ];
-    let resolved: ConflictInfo[] = [ ];
 
-    for (let conflict of await this.findModuleConflicts(module)) {
-      if (!await this.resolveConflict(conflict, module)) {
-        unresolved.push(conflict);
+  protected async painlessSyncInto(module: ModuleInfo, syncTarget: string): Promise<void> {
+    const copy = (source: string, target: string) => {
+      if (this.isPainlessIgnored(module, source)) {
+        return;
+      }
+
+      let sourceStat = fs.statSync(source);
+      if (sourceStat.isDirectory()) {
+        fs.readdirSync(source).forEach(sourceFilename => {
+          copy(path.join(source, sourceFilename), path.join(target, sourceFilename));
+        });
       } else {
-        resolved.push(conflict);
+        let doCopy = false;
+
+        let targetStat: fs.Stats|null = null;
+        try {
+          targetStat = fs.statSync(target);
+          doCopy = sourceStat.mtime.valueOf() > targetStat.mtime.valueOf();
+        } catch (error) {
+          doCopy = error.code === "ENOENT";
+          if (error.code !== "ENOENT") {
+            console.log(chalk.red(`Error while copying to ${target}: ${error.message}`));
+          }
+        }
+
+        if (doCopy) {
+          // console.log(`${source} -> ${target}`);
+          fs.copySync(source, target);
+        }
       }
-    }
+    };
 
-    return { unresolved, resolved };
-  }
-
-  public logConflicts(conflicts: ConflictInfo[]): void {
-    for (let conflict of conflicts) {
-      if (!conflict.installed) {
-        console.log(chalk.red(`CONFLICT: package "${conflict.name}" (${conflict.semver}) is required by module [${conflict.module.name}], but not installed in app`));
-      } else {
-        console.log(chalk.red(
-            `CONFLICT: package "${conflict.name}" is required by module [${conflict.module.name}], but app has incompatible version installed.
-          Required: ${conflict.semver}, installed: ${conflict.version}`
-        ));
-      }
-    }
-  }
-
-  public async resyncApp(): Promise<void> {
-    this.config.modules.forEach(this.resyncModule.bind(this));
-  }
-
-  public async resyncModule(module: ModuleInfo): Promise<void> {
-    let watcher = this.watchers[module.name];
-    if (watcher) {
-      watcher.close();
-      delete this.watchers[module.name];
-    }
-
-    this.initedModules = this.initedModules.filter(moduleName => moduleName !== module.name);
-    this.watchModule(module, false);
-  }
-
-  protected watchModule(module: ModuleInfo, logSkipped: boolean = true): boolean {
-    let moduleAppPath = path.join(this.config.app.home, "node_modules", module.npmName.name);
-
-    let forceModules = this.config.app.forceModules;
-    if (forceModules.indexOf(module.name) >= 0 || forceModules.indexOf(module.npmName.name) >= 0 || fs.existsSync(moduleAppPath)) {
-      console.log(chalk.green(`SYNCED: ${module.path} → ${moduleAppPath}`));
-
-      fs.mkdirpSync(moduleAppPath);
-      fs.emptyDirSync(moduleAppPath);
-
-      let watcher = chokidar.watch(module.path, {
-        ignored: IGNORE_REGEXPS,
-        followSymlinks: false,
-        awaitWriteFinish: true,
-        atomic: true
-      });
-
-      watcher.on("add", this.onAddFile.bind(this, module, moduleAppPath));
-      watcher.on("change", this.onChangeFile.bind(this, module, moduleAppPath));
-      watcher.on("unlink", this.onRemoveFile.bind(this, module, moduleAppPath));
-      watcher.on("addDir", this.onAddDir.bind(this, module, moduleAppPath));
-      watcher.on("unlinkDir", this.onRemoveDir.bind(this, module, moduleAppPath));
-      watcher.on("error", error => console.log(chalk.red(`watcher error: ${error.message}`)));
-      watcher.on("ready", () => this.initedModules.push(module.name));
-
-      this.watchers[module.name] = watcher;
-
-      return true;
-    } else {
-      if (logSkipped) {
-        console.log(`Skipping sync for ${module.npmName.name}, directory "${moduleAppPath}" does not exist and the module is not listed in "app.forceModules"`);
-      }
-
-      return false;
-    }
+    copy(module.path, syncTarget);
   }
 }
