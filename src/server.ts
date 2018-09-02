@@ -19,6 +19,8 @@ const NPM_SERVER_PORT = 5001;
 const NPMRC_BACKUP_FILENAME = ".npmrc-norman-backup";
 const LOCKFILE_BACKUP_FILENAME = "package-lock.norman-backup.json";
 
+const TEMP_DIR = "/tmp/norman";
+
 
 const IGNORED_DIRS = [ "node_modules", ".git", ".idea" ];
 
@@ -258,12 +260,11 @@ export class LocalNpmServer {
 
 
   protected async packModule(module: ModuleInfo): Promise<string> {
-    let tempDirParent = "/tmp/norman";
-    if (!fs.existsSync(tempDirParent)) {
-      fs.mkdirpSync(tempDirParent);
+    if (!fs.existsSync(TEMP_DIR)) {
+      fs.mkdirpSync(TEMP_DIR);
     }
 
-    let tempDir = path.join(tempDirParent, utils.randomString());
+    let tempDir = path.join(TEMP_DIR, utils.randomString());
 
     const copyDir = (sourceDir: string) => {
       let filenames = fs.readdirSync(sourceDir);

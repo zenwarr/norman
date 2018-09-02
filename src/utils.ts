@@ -76,57 +76,6 @@ export function updateSymlink(to: string, from: string): void {
 }
 
 
-export async function initPackage(dir: string, name?: string): Promise<void> {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirpSync(dir);
-  }
-
-  // disable package-lock.json
-  let npmrcLocation = path.join(dir, ".npmrc");
-  if (!fs.existsSync(npmrcLocation)) {
-    fs.writeFileSync(npmrcLocation, "package-lock=false", { encoding: "utf-8" });
-  }
-
-  if (!fs.existsSync(path.join(dir, "node_modules"))) {
-    fs.mkdirpSync(path.join(dir, "node_modules"));
-
-    let args: string[];
-    if (name) {
-      args = [ "init", name, "-y" ]
-    } else {
-      args = [ "init", "-y" ]
-    }
-
-    await runCommand("npm", args, {
-      cwd: dir
-    });
-  }
-}
-
-
-export async function installRemotePackage(name: string, semver: string, targetDir: string): Promise<void> {
-  // create temp directory with random name and initialize package inside it
-  let randomTempDir = path.join("/tmp/norman", randomString());
-
-  await initPackage(randomTempDir);
-
-  // and install desired package
-  let packageSpec = `${name}@${semver}`;
-  await runCommand("npm", [ "install", packageSpec, "--no-save", "--legacy-bundling" ], {
-    cwd: randomTempDir
-  });
-
-  // now copy installed package to targetDir
-  let targetPackageDir = path.join(targetDir, "node_modules", name);
-  if (fs.existsSync(targetPackageDir)) {
-    fs.removeSync(targetPackageDir);
-  }
-  fs.copySync(path.join(randomTempDir, "node_modules", name), targetPackageDir);
-
-  fs.removeSync(randomTempDir);
-}
-
-
 export function randomString(): string {
   const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 

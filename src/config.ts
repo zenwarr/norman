@@ -24,9 +24,7 @@ export interface ModuleInfo {
   npmIgnore: boolean|string;
   fetchDone: boolean;
   installDone: boolean;
-  relink: boolean;
   syncTargets: string[];
-  prevHash?: string;
   liveDeps: boolean;
 }
 
@@ -34,8 +32,7 @@ const DEFAULT_MODULE_INFO: Partial<ModuleInfo> = {
   npmInstall: true,
   buildCommands: [],
   fetchDone: false,
-  installDone: false,
-  relink: true
+  installDone: false
 };
 
 export interface Config {
@@ -167,7 +164,6 @@ export function loadConfig(configPath: string|null): Config {
           npmIgnore: config.defaultNpmIgnore,
           fetchDone: true,
           installDone: false,
-          relink: false,
           syncTargets: [],
           liveDeps: true
         };
@@ -224,8 +220,6 @@ function moduleFromConfig(inputConfig: any, configLocation: string, moduleConfig
       }
     }
   }
-
-  moduleConfig.relink = moduleConfig.relink == null ? true : moduleConfig.relink;
 
   if (!moduleConfig.path) {
     moduleConfig.path = path.join(inputConfig.modulesDirectory, moduleConfig.ignoreOrg ? moduleConfig.npmName.pkg : fullName);

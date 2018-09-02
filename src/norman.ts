@@ -16,6 +16,8 @@ export type Arguments = {
 } | {
   subCommand: "start",
   watch: boolean;
+} | {
+  subCommand: "list-modules"
 });
 
 
@@ -105,6 +107,10 @@ export class Norman {
       defaultValue: false
     });
 
+    let listModulesParser = subparsers.addParser("list-modules", {
+      help: "List all modules loaded from the configuration files"
+    });
+
     let args: Arguments = argparser.parseArgs();
     this._args = args;
 
@@ -122,9 +128,18 @@ export class Norman {
       }
     }
 
-    console.log('args: ', args);
-
     this._config = loadConfig(args.config);
+
+    if (args.subCommand === "list-modules") {
+      console.log(chalk.green("-- BEGIN MODULES LIST"));
+      for (let module of this.config.modules) {
+        console.log(`${module.npmName.name}: ${module.path}`);
+      }
+      console.log(chalk.green("-- END MODULES LIST"));
+
+      process.exit(0);
+      return;
+    }
 
     this._server = new LocalNpmServer(this);
     this._fetcher = new ModuleFetcher(this);
@@ -141,8 +156,17 @@ export class Norman {
       this._appSynchronizer = new AppSynchronizer(this);
 
       let localModules = args.paths.map((argPath): ModuleInfo => {
+        if (!argPath.endsWith("/")) {
+          argPath += "/";
+        }
+
         let localModule = this.config.modules.find(module => {
-          return path.normalize(module.path) === path.normalize(argPath);
+          let modulePath = module.path;
+          if (!modulePath.endsWith("/")) {
+            modulePath += "/";
+          }
+
+          return path.normalize(modulePath) === path.normalize(argPath);
         });
 
         if (!localModule) {

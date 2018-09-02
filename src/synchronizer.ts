@@ -5,7 +5,7 @@ import {Config, ModuleInfo} from "./config";
 import {Norman} from "./norman";
 import * as chokidar from "chokidar";
 import chalk from "chalk";
-import ignore from "ignore";
+import {ModuleStateManager} from "./module-state-manager";
 
 
 const IGNORE_REGEXPS = [
@@ -284,18 +284,23 @@ export class AppSynchronizer {
 
     await this.norman.localNpmServer.walkDependencyTree(localDependencies, async module => {
       if (this.norman.args.subCommand === "sync" && this.norman.args.buildDeps) {
-        for (let buildCommand of module.buildCommands) {
-          if (alreadyBuilt!.find(m => m === module.npmName.name)) {
-            return;
+        let stateManager = new ModuleStateManager(this.norman, module);
+        if (await stateManager.isModuleChanged()) {
+          for (let buildCommand of module.buildCommands) {
+            if (alreadyBuilt!.find(m => m === module.npmName.name)) {
+              return;
+            }
+
+            await this.syncModule(module, alreadyBuilt);
+
+            await utils.runCommand("npm", [ "run", buildCommand ], {
+              cwd: module.path
+            });
+
+            alreadyBuilt!.push(module.npmName.name);
           }
 
-          await this.syncModule(module, alreadyBuilt);
-
-          await utils.runCommand("npm", [ "run", buildCommand ], {
-            cwd: module.path
-          });
-
-          alreadyBuilt!.push(module.npmName.name);
+          await stateManager.saveActualState();
         }
       }
     });
@@ -348,24 +353,38 @@ export class AppSynchronizer {
   }
 
 
-  protected async painlessSyncInto(module: ModuleInfo, syncTarget: string): Promise<void> {
-    const copy = (source: string, target: string) => {
+  async walkModuleFiles(module: ModuleInfo, walker: (filename: string, state: fs.Stats) => Promise<void>): Promise<void> {
+    const handle = async (source: string) => {
       if (this.isPainlessIgnored(module, source)) {
         return;
       }
 
       let sourceStat = fs.statSync(source);
+
+      await walker(source, sourceStat);
+
       if (sourceStat.isDirectory()) {
-        fs.readdirSync(source).forEach(sourceFilename => {
-          copy(path.join(source, sourceFilename), path.join(target, sourceFilename));
-        });
-      } else {
+        for (let filename of fs.readdirSync(source)) {
+          await handle(path.join(source, filename));
+        }
+      }
+    };
+
+    return handle(module.path);
+  }
+
+
+  protected async painlessSyncInto(module: ModuleInfo, syncTarget: string): Promise<void> {
+    return this.walkModuleFiles(module, async (filename: string, stat: fs.Stats) => {
+      let target = path.join(syncTarget, path.relative(module.path, filename));
+
+      if (!stat.isDirectory()) {
         let doCopy = false;
 
         let targetStat: fs.Stats|null = null;
         try {
           targetStat = fs.statSync(target);
-          doCopy = sourceStat.mtime.valueOf() > targetStat.mtime.valueOf();
+          doCopy = stat.mtime.valueOf() > targetStat.mtime.valueOf();
         } catch (error) {
           doCopy = error.code === "ENOENT";
           if (error.code !== "ENOENT") {
@@ -374,12 +393,12 @@ export class AppSynchronizer {
         }
 
         if (doCopy) {
-          // console.log(`${source} -> ${target}`);
-          fs.copySync(source, target);
+          console.log(`${filename} -> ${target}`);
+          fs.copySync(filename, target);
         }
+      } else {
+        fs.mkdirpSync(target);
       }
-    };
-
-    copy(module.path, syncTarget);
+    });
   }
 }
