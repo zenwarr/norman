@@ -131,11 +131,10 @@ export class AppSynchronizer {
 
   protected initedModules: string[] = [ ];
   protected watchers: { [name: string]: chokidar.FSWatcher|undefined } = { };
-  protected ignoreInstances: { [name: string]: any } = { };
 
   protected isIgnored(module: ModuleInfo, sourceFilePath: string): boolean {
-    if (this.ignoreInstances[module.name]) {
-      return this.ignoreInstances[module.name].ignores(sourceFilePath);
+    if (module.ignoreInstance) {
+      return module.ignoreInstance.ignores(sourceFilePath);
     }
     return false;
   }
@@ -282,7 +281,7 @@ export class AppSynchronizer {
       }
     }
 
-    await this.norman.localNpmServer.walkDependencyTree(localDependencies, async module => {
+    await this.norman.walkDependencyTree(localDependencies, async module => {
       if (this.norman.args.subCommand === "sync" && this.norman.args.buildDeps) {
         let stateManager = new ModuleStateManager(this.norman, module);
         if (await stateManager.isModuleChanged()) {
@@ -307,7 +306,7 @@ export class AppSynchronizer {
 
     let runInstall = false;
 
-    await this.norman.localNpmServer.walkDependencyTree(localDependencies, async module => {
+    await this.norman.walkDependencyTree(localDependencies, async module => {
       // check if module is installed into this module node_modules
       let installedPath = path.join(localModule.path, "node_modules", module.npmName.name);
       if (!fs.existsSync(installedPath)) {
@@ -338,24 +337,20 @@ export class AppSynchronizer {
   }
 
 
-  protected isPainlessIgnored(module: ModuleInfo, filepath: string): boolean {
-    if (this.isIgnored(module, filepath)) {
-      return true;
-    }
-
+  protected isFileImportant(module: ModuleInfo, filepath: string): boolean {
     for (let ignoreRe of IGNORE_REGEXPS) {
       if (filepath.match(ignoreRe)) {
-        return true;
+        return false;
       }
     }
 
-    return false;
+    return true;
   }
 
 
   async walkModuleFiles(module: ModuleInfo, walker: (filename: string, state: fs.Stats) => Promise<void>): Promise<void> {
     const handle = async (source: string) => {
-      if (this.isPainlessIgnored(module, source)) {
+      if (!this.isFileImportant(module, source)) {
         return;
       }
 
@@ -375,7 +370,13 @@ export class AppSynchronizer {
 
 
   protected async painlessSyncInto(module: ModuleInfo, syncTarget: string): Promise<void> {
+    console.log(`Making sync for module ${module.npmName.name} into ${syncTarget}`);
+
     return this.walkModuleFiles(module, async (filename: string, stat: fs.Stats) => {
+      if (module.ignoreInstance && module.ignoreInstance.ignores(filename)) {
+        return;
+      }
+
       let target = path.join(syncTarget, path.relative(module.path, filename));
 
       if (!stat.isDirectory()) {
@@ -393,6 +394,11 @@ export class AppSynchronizer {
         }
 
         if (doCopy) {
+          let parentDestDir = path.dirname(target);
+          if (!fs.existsSync(parentDestDir)) {
+            fs.mkdirpSync(parentDestDir);
+          }
+
           console.log(`${filename} -> ${target}`);
           fs.copySync(filename, target);
         }

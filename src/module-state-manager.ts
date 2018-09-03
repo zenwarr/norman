@@ -16,7 +16,7 @@ export interface ModuleState {
 }
 
 
-const STATE_DIR = path.join(os.homedir(), ".norman");
+const STATE_DIR = path.join(os.homedir(), ".norman-state");
 
 
 export class ModuleStateManager {
@@ -49,6 +49,18 @@ export class ModuleStateManager {
       timestamp: (new Date()).valueOf(),
       files: resultFiles
     }
+  }
+
+
+  getStateHash(state: ModuleState): string {
+    let parts: string[] = [ state.module ];
+
+    for (let filename of Object.keys(state.files)) {
+      parts.push(filename);
+      parts.push('' + state.files[filename]);
+    }
+
+    return crypto.createHmac("sha256", "norman").update(parts.join(":")).digest('hex');
   }
 
 
@@ -162,5 +174,10 @@ export class ModuleStateManager {
     }
 
     return false;
+  }
+
+
+  static cleanState() {
+    fs.removeSync(STATE_DIR);
   }
 }

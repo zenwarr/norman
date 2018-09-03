@@ -2,9 +2,8 @@ import {ModuleInfo} from "./config";
 import * as utils from "./utils";
 import * as path from "path";
 import * as fs from "fs-extra";
-import chalk from "chalk";
 import {Norman} from "./norman";
-import {ModuleInfoWithDeps} from "./server";
+import {ModuleStateManager} from "./module-state-manager";
 
 
 export default class ModuleFetcher {
@@ -29,7 +28,9 @@ export default class ModuleFetcher {
 
     // await this.norman.localNpmServer.setupLiveDeps();
 
-    await this.installModules();
+    // await this.installModules();
+
+    // await this.buildModules();
   }
 
 
@@ -46,12 +47,36 @@ export default class ModuleFetcher {
 
 
   async installModules() {
-    await this.norman.localNpmServer.walkDependencyTree(this.config.modules, async module => {
+    await this.norman.walkDependencyTree(this.config.modules, async module => {
       if (fs.existsSync(path.join(module.path, "node_modules"))) {
         return;
       }
 
       await this.norman.localNpmServer.installModuleDeps(module);
+
+      let stateManager = new ModuleStateManager(this.norman, module);
+
+      for (let buildCommand of module.buildCommands) {
+        await utils.runCommand("npm", [ "run", buildCommand ], {
+          cwd: module.path
+        });
+      }
+
+      await stateManager.saveActualState();
     });
+  }
+
+
+  async buildModuleIfChanged(module: ModuleInfo): Promise<void> {
+    let stateManager = new ModuleStateManager(this.norman, module);
+    if (await stateManager.isModuleChanged()) {
+      for (let buildCommand of module.buildCommands) {
+        await utils.runCommand("npm", [ "run", buildCommand ], {
+          cwd: module.path
+        });
+      }
+
+      await stateManager.saveActualState();
+    }
   }
 }

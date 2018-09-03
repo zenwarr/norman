@@ -11,6 +11,8 @@ import {ModuleInfo} from "./config";
 import * as utils from "./utils";
 import chalk from "chalk";
 import * as contentType from "content-type";
+import * as crypto from "crypto";
+import {ModuleStateManager} from "./module-state-manager";
 
 const accept = require("accept");
 
@@ -20,9 +22,7 @@ const NPMRC_BACKUP_FILENAME = ".npmrc-norman-backup";
 const LOCKFILE_BACKUP_FILENAME = "package-lock.norman-backup.json";
 
 const TEMP_DIR = "/tmp/norman";
-
-
-const IGNORED_DIRS = [ "node_modules", ".git", ".idea" ];
+const TARBALL_CACHE_DIR = "/tmp/norman-cache";
 
 
 export type NpmConfig = {
@@ -220,14 +220,33 @@ export class LocalNpmServer {
     let localModule = this.config.modules.find(module => module.npmName.name === packageName);
     if (localModule) {
       try {
-        let archivePath = await this.packModule(localModule);
-        // console.log(`packaged package ${packageName} to archive ${archivePath}`);
+        let stateManager = new ModuleStateManager(this.norman, localModule);
+        let actualState = await stateManager.loadActualState();
+        let stateHash = stateManager.getStateHash(actualState);
+
+        let archivePath: string;
+
+        let packagedDirPath = path.join(TEMP_DIR, `${packageName}-${stateHash}`);
+        if (fs.existsSync(packagedDirPath)) {
+          archivePath = this.getArchivePathFromDir(localModule, packagedDirPath);
+        } else {
+          archivePath = await this.packModule(localModule, stateHash);
+
+          await stateManager.saveActualState();
+        }
+
         res.sendFile(archivePath);
       } catch (error) {
         console.log(error);
       }
     } else {
       try {
+        let cachedFileName = this.getCachedTarballPath(req.query.url);
+        if (cachedFileName) {
+          res.sendFile(cachedFileName);
+          return;
+        }
+
         let headers = Object.assign({}, req.headers, { host: url.parse(req.query.url).host });
 
         let token = this.getTokenForUrl(req.query.url);
@@ -240,6 +259,8 @@ export class LocalNpmServer {
           resolveWithFullResponse: true,
           encoding: null
         });
+
+        await this.cacheTarball(req.query.url, response.body);
 
         res.status(response.statusCode).set(response.headers).send(response.body);
       } catch (error) {
@@ -254,66 +275,72 @@ export class LocalNpmServer {
   }
 
 
+  protected pathForCachedTarball(url: string): string {
+    return path.join(TARBALL_CACHE_DIR, crypto.createHmac("sha256", "norman").update(url).digest('hex'));
+  }
+
+
+  protected getCachedTarballPath(url: string): string|null {
+    let cachedPath = this.pathForCachedTarball(url);
+    return fs.existsSync(cachedPath) ? cachedPath : null;
+  }
+
+
+  protected cacheTarball(url: string, data: Buffer): void {
+    fs.mkdirpSync(TARBALL_CACHE_DIR);
+    fs.writeFileSync(this.pathForCachedTarball(url), data);
+  }
+
+
   protected isIgnored(module: ModuleInfo, filepath: string): boolean {
     return filepath.endsWith(".tgz");
   }
 
 
-  protected async packModule(module: ModuleInfo): Promise<string> {
+  async packModule(module: ModuleInfo, stateHash: string): Promise<string> {
+    await this.norman.moduleFetcher.buildModuleIfChanged(module);
+
     if (!fs.existsSync(TEMP_DIR)) {
       fs.mkdirpSync(TEMP_DIR);
     }
 
-    let tempDir = path.join(TEMP_DIR, utils.randomString());
+    let tempDir = path.join(TEMP_DIR, `${module.npmName.name}-${stateHash}`);
 
-    const copyDir = (sourceDir: string) => {
-      let filenames = fs.readdirSync(sourceDir);
-
-      for (let filename of filenames) {
-        let filepath = path.join(sourceDir, filename);
-        let relativePath = path.relative(module.path, filepath);
-
-        if (this.isIgnored(module, filepath) || IGNORED_DIRS.indexOf(filename) >= 0) {
-          continue;
-        }
-
-        let parentDestDir = path.dirname(path.join(tempDir, relativePath));
-        if (!fs.existsSync(parentDestDir)) {
-          fs.mkdirpSync(parentDestDir);
-        }
-
-        if (fs.statSync(filepath).isDirectory()) {
-          copyDir(filepath);
-        } else {
-          let destFilePath = path.join(tempDir, relativePath);
-
-          fs.copyFileSync(filepath, destFilePath);
-        }
-      }
-    };
-
-    copyDir(module.path);
-
-    // set npmignore
-    if (typeof module.npmIgnore === "string") {
-      let ignorePath = module.npmIgnore;
-      if (!path.isAbsolute(ignorePath)) {
-        ignorePath = path.resolve(this.config.mainConfigDir, ignorePath);
+    await this.norman.appSynchronizer.walkModuleFiles(module, async (source, stat) => {
+      let relativeSourceFileName = path.relative(module.path, source);
+      if (relativeSourceFileName === ".gitignore" || relativeSourceFileName === ".npmignore") {
+        return;
       }
 
-      try {
-        fs.copyFileSync(ignorePath, path.join(tempDir, ".npmignore"));
-      } catch (error) {
-        console.log(`Cannot read ignore file for npm publishing: ${ignorePath}, ${error.message}`);
+      let target = path.join(tempDir, path.relative(module.path, source));
+
+      if (module.ignoreInstance && module.ignoreInstance.ignores(source)) {
+        return;
       }
-    }
+
+      let parentDestDir = path.dirname(target);
+      if (!fs.existsSync(parentDestDir)) {
+        fs.mkdirpSync(parentDestDir);
+      }
+
+      if (!stat.isDirectory()) {
+        fs.copyFileSync(source, target);
+      } else {
+        fs.mkdirpSync(target);
+      }
+    });
 
     await utils.runCommand("npm", [ "pack" ], {
       cwd: tempDir,
       silent: true
     });
 
-    let moduleVersion = fs.readJSONSync(path.join(tempDir, "package.json")).version;
+    return this.getArchivePathFromDir(module, tempDir);
+  }
+
+
+  protected getArchivePathFromDir(module: ModuleInfo, outPath: string): string {
+    let moduleVersion = fs.readJSONSync(path.join(outPath, "package.json")).version;
 
     let archiveName: string;
     if (module.npmName.org) {
@@ -322,7 +349,7 @@ export class LocalNpmServer {
       archiveName = `${module.npmName.pkg}-${moduleVersion}.tgz`;
     }
 
-    return path.join(tempDir, archiveName);
+    return path.join(outPath, archiveName);
   }
 
 
@@ -454,61 +481,6 @@ export class LocalNpmServer {
   }
 
 
-  getDependencyTree(modules: ModuleInfo[]): ModuleInfoWithDeps[] {
-    return modules.map(module => {
-      let subDeps = utils.getPackageDeps(module.path).map(moduleName => this.norman.getModuleInfo(moduleName)).filter(dep => dep != null);
-
-      return {
-        module,
-        dependencies: subDeps as ModuleInfo[]
-      }
-    });
-  }
-
-
-  async walkDependencyTree(modules: ModuleInfo[], walker: (module: ModuleInfo) => Promise<void>): Promise<void> {
-    let tree = this.getDependencyTree(modules);
-
-    const walkedModules: string[] = [];
-
-    const markWalked = (module: ModuleInfo) => {
-      if (walkedModules.indexOf(module.npmName.name) < 0) {
-        walkedModules.push(module.npmName.name);
-      }
-    };
-
-    const isAlreadyWalked = (module: ModuleInfo) => {
-      return walkedModules.indexOf(module.npmName.name) >= 0;
-    };
-
-    const walkModule = async (module: ModuleInfoWithDeps, parents: string[]) => {
-      if (isAlreadyWalked(module.module)) {
-        return;
-      }
-
-      for (let dep of module.dependencies) {
-        if (parents.indexOf(dep.npmName.name) >= 0) {
-          // recursive dep
-          throw new Error(`Recursive dependency: ${dep.npmName.name}, required by ${parents.join(" -> ")}`);
-        }
-
-        let depWithDeps = tree.find(module => module.module.npmName.name === dep.npmName.name);
-        if (depWithDeps) {
-          await walkModule(depWithDeps, parents.concat([ module.module.npmName.name ]));
-        }
-      }
-
-      await walker(module.module);
-
-      markWalked(module.module);
-    };
-
-    for (let module of tree) {
-      await walkModule(module, []);
-    }
-  }
-
-
   async installLocalModule(installTo: ModuleInfo, moduleToInstall: ModuleInfo): Promise<void> {
     await utils.cleanNpmCache();
 
@@ -540,5 +512,15 @@ export class LocalNpmServer {
     }
 
     await utils.cleanNpmCache();
+  }
+
+
+  static cleanCache(): void {
+    fs.removeSync(TARBALL_CACHE_DIR);
+  }
+
+
+  static cleanTemp(): void {
+    fs.removeSync(TEMP_DIR);
   }
 }

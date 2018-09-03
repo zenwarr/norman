@@ -3,6 +3,7 @@ import * as fs from "fs-extra";
 import * as process from "process";
 import chalk from "chalk";
 import {IPluginClass, PackagePlugin, Plugin, SourceMapPlugin} from "./plugins";
+const ignore = require("ignore");
 
 const gitUrlParse = require("git-url-parse");
 
@@ -22,6 +23,7 @@ export interface ModuleInfo {
   path: string;
   ignoreOrg: boolean;
   npmIgnore: boolean|string;
+  ignoreInstance: any;
   fetchDone: boolean;
   installDone: boolean;
   syncTargets: string[];
@@ -32,7 +34,8 @@ const DEFAULT_MODULE_INFO: Partial<ModuleInfo> = {
   npmInstall: true,
   buildCommands: [],
   fetchDone: false,
-  installDone: false
+  installDone: false,
+  ignoreInstance: null
 };
 
 export interface Config {
@@ -162,11 +165,14 @@ export function loadConfig(configPath: string|null): Config {
           path: config.mainConfigDir,
           ignoreOrg: config.defaultIgnoreOrg,
           npmIgnore: config.defaultNpmIgnore,
+          ignoreInstance: null,
           fetchDone: true,
           installDone: false,
           syncTargets: [],
           liveDeps: true
         };
+
+        moduleInfo.ignoreInstance = createIgnoreInstanceForModule(moduleInfo);
 
         config.modules.push(moduleInfo);
       }
@@ -191,6 +197,28 @@ export function loadConfig(configPath: string|null): Config {
   } else {
     return loadConfig(findConfigForDir(process.cwd()));
   }
+}
+
+
+function createIgnoreInstanceForModule(module: ModuleInfo): any {
+  let resolvedIgnorePath: string|null = null;
+
+  if (typeof module.npmIgnore === "boolean") {
+    let ignorePath = path.join(module.path, ".npmignore");
+    if (fs.existsSync(ignorePath)) {
+      resolvedIgnorePath = ignorePath;
+    }
+  } else {
+    resolvedIgnorePath = module.npmIgnore;
+  }
+
+  if (!resolvedIgnorePath) {
+    return null;
+  }
+
+  let ignoreInstance = ignore();
+  ignoreInstance.add(fs.readFileSync(resolvedIgnorePath, "utf-8"));
+  return ignoreInstance;
 }
 
 
@@ -228,6 +256,8 @@ function moduleFromConfig(inputConfig: any, configLocation: string, moduleConfig
   }
 
   moduleConfig.liveDeps = true;
+
+  moduleConfig.ignoreInstance = createIgnoreInstanceForModule(moduleConfig);
 
   return Object.assign({}, DEFAULT_MODULE_INFO, moduleConfig);
 }
