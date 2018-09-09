@@ -1,12 +1,16 @@
-import {ModuleInfo} from "./config";
 import * as fs from "fs-extra";
 import * as path from "path";
 import * as os from "os";
 import * as crypto from "crypto";
-import {Norman} from "./norman";
+import {ModuleBase} from "./base";
+import {LookupAddress} from "dns";
 
 
 export type ModuleStateFiles = { [path: string]: number };
+
+
+export const BUILD_TAG = "build";
+export const PACK_TAG = "pack";
 
 
 export interface ModuleState {
@@ -19,52 +23,35 @@ export interface ModuleState {
 const STATE_DIR = path.join(os.homedir(), ".norman-state");
 
 
-export class ModuleStateManager {
-  protected _module: ModuleInfo;
-  protected _norman: Norman;
-
-
-  constructor(norman: Norman, module: ModuleInfo) {
-    this._module = module;
-    this._norman = norman;
-  }
-
-
-  get norman(): Norman {
-    return this._norman;
-  }
-
-
-  async loadActualState(): Promise<ModuleState> {
+export class ModuleStateManager extends ModuleBase {
+  public async loadActualState(): Promise<ModuleState> {
     const resultFiles: ModuleStateFiles = { };
 
-    await this.norman.appSynchronizer.walkModuleFiles(this._module, async filename => {
-      let stat = fs.statSync(filename);
-
+    await this.module.walkModuleFiles(async(filename, stat) => {
       resultFiles[filename] = stat.mtime.valueOf();
     });
 
     return {
-      module: this._module.npmName.name,
+      module: this.module.npmName.name,
       timestamp: (new Date()).valueOf(),
       files: resultFiles
-    }
+    };
   }
 
 
-  getStateHash(state: ModuleState): string {
+  public getStateHash(state: ModuleState): string {
     let parts: string[] = [ state.module ];
 
     for (let filename of Object.keys(state.files)) {
       parts.push(filename);
-      parts.push('' + state.files[filename]);
+      parts.push("" + state.files[filename]);
     }
 
-    return crypto.createHmac("sha256", "norman").update(parts.join(":")).digest('hex');
+    return crypto.createHmac("sha256", "norman").update(parts.join(":")).digest("hex");
   }
 
 
-  async loadSavedState(): Promise<ModuleState|null> {
+  public async loadSavedState(stateTag: string): Promise<ModuleState | null> {
     let stateFilePath = this.pathToStateFile();
 
     let loadedState: any;
@@ -83,14 +70,19 @@ export class ModuleStateManager {
       throw new Error(`Invalid state file: ${stateFilePath}`);
     }
 
+    if (!(stateTag in loadedState)) {
+      return null;
+    }
+    loadedState = loadedState[stateTag];
+
     let data = loadedState.data;
     if (!data || !Array.isArray(data)) {
       throw new Error(`Invalid state file: ${stateFilePath}`);
     }
 
     for (let entry of data as ModuleState[]) {
-      if (entry.module === this._module.npmName.name) {
-        return entry as ModuleState;
+      if (entry.module === this.module.npmName.name) {
+        return entry;
       }
     }
 
@@ -98,12 +90,12 @@ export class ModuleStateManager {
   }
 
 
-  async saveState(state: ModuleState): Promise<void> {
+  public async saveState(state: ModuleState, stateTag: string): Promise<void> {
     let stateFilePath = this.pathToStateFile();
 
-    let loadedState: { data: ModuleState[] }|null = null;
+    let loadedStateFile: { [name: string]: { data: ModuleState[] } | undefined } | null = null;
     try {
-      loadedState = fs.readJSONSync(stateFilePath, {
+      loadedStateFile = fs.readJSONSync(stateFilePath, {
         encoding: "utf-8"
       });
     } catch (error) {
@@ -112,19 +104,22 @@ export class ModuleStateManager {
       }
     }
 
-    if (!loadedState) {
-      loadedState = { data: [] };
+    if (!loadedStateFile) {
+      loadedStateFile = { };
     }
 
-    let data: ModuleState[] = loadedState.data;
-    if (!data || !Array.isArray(data)) {
-      loadedState = { data: [] };
+    let stateForTag: { data: ModuleState[] } = loadedStateFile[stateTag] || { data: [] };
+
+    if (!Array.isArray(stateForTag.data)) {
+      stateForTag = { data: [] };
     }
 
     let existingStateFound = false;
 
+    let data = stateForTag.data;
+
     for (let q = 0; q < data.length; ++q) {
-      if (data[q].module === this._module.npmName.name) {
+      if (data[q].module === this.module.npmName.name) {
         data[q] = state;
         existingStateFound = true;
         break;
@@ -135,26 +130,28 @@ export class ModuleStateManager {
       data.push(state);
     }
 
-    fs.outputJSONSync(stateFilePath, loadedState, {
+    loadedStateFile[stateTag] = stateForTag;
+
+    fs.outputJSONSync(stateFilePath, loadedStateFile, {
       encoding: "utf-8",
       spaces: 2
     });
   }
 
 
-  async saveActualState(): Promise<void> {
-    return this.saveState(await this.loadActualState());
+  public async saveActualState(stateTag: string): Promise<void> {
+    return this.saveState(await this.loadActualState(), stateTag);
   }
 
 
-  pathToStateFile(): string {
-    let hash = crypto.createHmac("sha256", "norman").update(this.norman.config.mainConfigDir).digest('hex');
+  public pathToStateFile(): string {
+    let hash = crypto.createHmac("sha256", "norman").update(this.norman.config.mainConfigDir).digest("hex");
     return path.join(STATE_DIR, `state-${hash}.json`);
   }
 
 
-  async isModuleChanged(): Promise<boolean> {
-    let prevState = await this.loadSavedState();
+  public async isModuleChanged(stateTag: string): Promise<boolean> {
+    let prevState = await this.loadSavedState(stateTag);
     let currentState = await this.loadActualState();
 
     if (!prevState) {
@@ -168,7 +165,7 @@ export class ModuleStateManager {
     let files = Object.keys(prevState.files);
     for (let filename of files) {
       if (!currentState.files[filename] || currentState.files[filename] > prevState.files[filename]) {
-        console.log(`module ${this._module.npmName.name} changed, file ${filename}`);
+        console.log(`module ${this.module.npmName.name} changed, file ${filename}`);
         return true;
       }
     }
@@ -177,7 +174,7 @@ export class ModuleStateManager {
   }
 
 
-  static cleanState() {
+  public static cleanState() {
     fs.removeSync(STATE_DIR);
   }
 }

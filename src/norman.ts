@@ -1,47 +1,49 @@
-import {Config, loadConfig, ModuleInfo} from "./config";
-import {AppSynchronizer} from "./synchronizer";
+import {ModuleSynchronizer} from "./synchronizer";
 import ModuleFetcher from "./fetcher";
 import chalk from "chalk";
 import * as path from "path";
 import {ArgumentParser} from "argparse";
-import {LocalNpmServer, ModuleInfoWithDeps} from "./server";
-import * as utils from "./utils";
+import {LocalNpmServer} from "./server";
 import {ModuleStateManager} from "./module-state-manager";
+import {Config} from "./config";
+import {ModuleInfo} from "./module-info";
+import {ModulePackager} from "./module-packager";
+import {ModulesFeeder} from "./module-watcher";
 
 
 export type Arguments = {
-  config: string|null;
+  config: string | null;
 } & ({
   subCommand: "sync";
   buildDeps: boolean;
   path: string;
+  watch: string;
 } | {
-  subCommand: "start",
+  subCommand: "start";
   watch: boolean;
 } | {
-  subCommand: "list-modules"
+  subCommand: "list-modules";
 } | {
-  subCommand: "dependency-tree"
+  subCommand: "dependency-tree";
 } | {
-  subCommand: "clean",
-  cleanWhat: string
+  subCommand: "clean";
+  cleanWhat: string;
 });
 
 
 export class Norman {
-  private _fetcher: ModuleFetcher|null = null;
-  private _server: LocalNpmServer|null = null;
-  private _appSynchronizer: AppSynchronizer|null = null;
-  private _config: Config|null = null;
-  private _args: Arguments|null = null;
+  private _fetcher: ModuleFetcher | null = null;
+  private _server: LocalNpmServer | null = null;
+  private _config: Config | null = null;
+  private _args!: Arguments;
 
 
-  get args(): Arguments {
-    return this._args!;
+  public get args(): Arguments {
+    return this._args;
   }
 
 
-  get moduleFetcher(): ModuleFetcher {
+  public get moduleFetcher(): ModuleFetcher {
     if (!this._fetcher) {
       throw new Error("Fetcher instance is not yet initialized");
     }
@@ -49,15 +51,7 @@ export class Norman {
   }
 
 
-  get appSynchronizer(): AppSynchronizer {
-    if (!this._appSynchronizer) {
-      throw new Error("App synhronizer instance is not yet initialized");
-    }
-    return this._appSynchronizer;
-  }
-
-
-  get localNpmServer(): LocalNpmServer {
+  public get localNpmServer(): LocalNpmServer {
     if (!this._server) {
       throw new Error("Local npm server is not yet initialized");
     }
@@ -65,7 +59,7 @@ export class Norman {
   }
 
 
-  get config(): Config {
+  public get config(): Config {
     if (!this._config) {
       throw new Error("Config is not yet loaded");
     }
@@ -73,12 +67,7 @@ export class Norman {
   }
 
 
-  getModuleInfo(moduleName: string): ModuleInfo|null {
-    return this.config.modules.find(module => module.npmName.name === moduleName || module.name === moduleName) || null;
-  }
-
-
-  async start() {
+  protected parseArgs() {
     let argparser = new ArgumentParser({
       addHelp: true
     });
@@ -97,6 +86,12 @@ export class Norman {
       action: "storeTrue",
       defaultValue: false,
       dest: "buildDeps"
+    });
+    syncParser.addArgument("--watch", {
+      help: "Watch for changes in dependent modules and sync immediately",
+      action: "storeTrue",
+      defaultValue: false,
+      dest: "watch"
     });
     syncParser.addArgument("path", { help: "Path to module to synchronize" });
 
@@ -127,109 +122,152 @@ export class Norman {
         args.config = path.resolve(process.cwd(), args.config);
       }
     }
+  }
 
-    if (args.subCommand === "sync" && args.path) {
-      if (!path.isAbsolute(args.path)) {
-        args.path = path.resolve(process.cwd(), args.path);
-      }
+
+  protected async handleCleanCommand(): Promise<void> {
+    let args = this.args;
+
+    if (args.subCommand !== "clean") {
+      return;
     }
 
-    this._config = loadConfig(args.config);
+    if (args.cleanWhat === "cache" || args.cleanWhat === "all") {
+      console.log(chalk.green("Cleaning local npm server cache"));
 
-    if (args.subCommand === "list-modules") {
-      console.log(chalk.green("-- BEGIN MODULES LIST"));
-      for (let module of this.config.modules) {
-        console.log(`${module.npmName.name}: ${module.path}`);
-      }
-      console.log(chalk.green("-- END MODULES LIST"));
+      LocalNpmServer.cleanCache();
 
-      process.exit(0);
-      return;
-    } else if (args.subCommand === "dependency-tree") {
-      console.log(chalk.green("-- BEGIN DEPENDENCY TREE"));
+      console.log(chalk.green("DONE"));
+    }
 
-      let tree = this.getDependencyTree(this.config.modules);
+    if (args.cleanWhat === "state" || args.cleanWhat === "all") {
+      console.log(chalk.green("Cleaning stored modules state"));
 
-      let isFirst = true;
+      ModuleStateManager.cleanState();
 
-      const printTree = (leaf: ModuleInfo, level: number = 0) => {
-        let prefix = level === 0 ? (isFirst ? '- ' : '\n- ') : ' '.repeat(level * 2 + 2);
-        console.log(`${prefix}${leaf.npmName.name}`);
+      console.log(chalk.green("DONE"));
+    }
 
-        let root = tree.find(treeLeaf => treeLeaf.module.npmName.name === leaf.npmName.name);
-        if (root) {
-          for (let dep of root.dependencies) {
-            printTree(dep, level + 1);
-          }
+    if (args.cleanWhat === "all") {
+      console.log(chalk.green("Cleaning temp files"));
+
+      ModulePackager.cleanTemp();
+
+      console.log(chalk.green("DONE"));
+    }
+
+    process.exit(0);
+    return;
+  }
+
+
+  protected async handleListModulesCommand(): Promise<void> {
+    console.log(chalk.green("-- BEGIN MODULES LIST"));
+    for (let module of this.config.modules) {
+      console.log(`${module.npmName.name}: ${module.path}`);
+    }
+    console.log(chalk.green("-- END MODULES LIST"));
+
+    process.exit(0);
+    return;
+  }
+
+
+  protected async handleDependencyTreeCommand(): Promise<void> {
+    console.log(chalk.green("-- BEGIN DEPENDENCY TREE"));
+
+    let tree = this.config.getDependencyTree(this.config.modules);
+
+    let isFirst = true;
+
+    const printTree = (leaf: ModuleInfo, level: number = 0) => {
+      let prefix = level === 0 ? (isFirst ? "- " : "\n- ") : " ".repeat(level * 2 + 2);
+      console.log(`${prefix}${leaf.npmName.name}`);
+
+      let root = tree.find(treeLeaf => treeLeaf.module.npmName.name === leaf.npmName.name);
+      if (root) {
+        for (let dep of root.dependencies) {
+          printTree(dep, level + 1);
         }
-      };
-
-      for (let treeRoot of tree) {
-        printTree(treeRoot.module);
-        isFirst = false;
       }
+    };
 
-      console.log(chalk.green("-- END DEPENDENCY TREE"));
+    for (let treeRoot of tree) {
+      printTree(treeRoot.module);
+      isFirst = false;
+    }
 
-      console.log(chalk.green(`\n-- BEGIN WALK ORDER`));
+    console.log(chalk.green("-- END DEPENDENCY TREE"));
 
-      await this.walkDependencyTree(this.config.modules, async module => {
-        console.log(module.npmName.name);
-      });
+    console.log(chalk.green("\n-- BEGIN WALK ORDER"));
 
-      console.log(chalk.green('-- END WALK ORDER'));
+    await this.config.walkDependencyTree(this.config.modules, async module => {
+      console.log(module.npmName.name);
+    });
 
-      process.exit(0);
-      return;
-    } else if (args.subCommand === "clean") {
-      if (args.cleanWhat === "cache" || args.cleanWhat === "all") {
-        console.log(chalk.green(`Cleaning local npm server cache`));
+    console.log(chalk.green("-- END WALK ORDER"));
 
-        LocalNpmServer.cleanCache();
+    process.exit(0);
+    return;
+  }
 
-        console.log(chalk.green('DONE'));
-      }
 
-      if (args.cleanWhat === "state" || args.cleanWhat === "all") {
-        console.log(chalk.green(`Cleaning stored modules state`));
+  protected async handleStartCommand(): Promise<void> {
+    let args = this.args;
 
-        ModuleStateManager.cleanState();
-
-        console.log(chalk.green('DONE'));
-      }
-
-      if (args.cleanWhat === "all") {
-        console.log(chalk.green(`Cleaning temp files`));
-
-        LocalNpmServer.cleanTemp();
-
-        console.log(chalk.green('DONE'));
-      }
-
-      process.exit(0);
+    if (args.subCommand !== "start") {
       return;
     }
 
     this._server = new LocalNpmServer(this);
-    this._fetcher = new ModuleFetcher(this);
-    this._appSynchronizer = new AppSynchronizer(this);
-
     await this._server.start();
-    await this._fetcher.start();
 
-    if (args.subCommand === "start") {
+    try {
+      this._fetcher = new ModuleFetcher(this);
+      await this.moduleFetcher.fetchModules();
       await this.moduleFetcher.installModules();
 
-      if (args.watch) {
-        await this._appSynchronizer.start();
-      }
-    } else if (args.subCommand === "sync") {
+      // if (args.watch) {
+      //   this._appSynchronizer = new AppSynchronizer(this);
+      //   await this._appSynchronizer.start();
+      // }
+    } finally {
+      await this._server.stop();
+    }
+  }
+
+
+  protected async handleSyncCommand(): Promise<void> {
+    let args = this.args;
+
+    if (args.subCommand !== "sync") {
+      return;
+    }
+
+    if (args.buildDeps && args.watch) {
+      console.log(chalk.red("--build-deps cannot be used with --watch"));
+      process.exit();
+      return;
+    }
+
+    this._server = new LocalNpmServer(this);
+    await this._server.start();
+
+    try {
+      this._fetcher = new ModuleFetcher(this);
+      await this._fetcher.fetchModules();
+      await this._fetcher.installModules();
+
       let argPath = args.path;
       let localModule = this.config.modules.find(module => {
         return module.npmName.name === argPath;
       });
 
       if (!localModule) {
+        if (!path.isAbsolute(argPath)) {
+          argPath = path.resolve(this.config.mainConfigDir, argPath);
+        }
+
         if (!argPath.endsWith("/")) {
           argPath += "/";
         }
@@ -250,64 +288,55 @@ export class Norman {
         }
       }
 
-      await this.appSynchronizer.syncModule(localModule);
+      if (args.watch) {
+        let feeder = new ModulesFeeder(this, [localModule]);
+        await feeder.start();
+      } else {
+        let synchronizer = new ModuleSynchronizer(this, localModule);
+        await synchronizer.sync(args.buildDeps);
+      }
+    } finally {
+      await this._server.stop();
     }
-
-    await this._server.stop();
   }
 
 
-  getDependencyTree(modules: ModuleInfo[]): ModuleInfoWithDeps[] {
-    return modules.map(module => {
-      let subDeps = utils.getPackageDeps(module.path).map(moduleName => this.getModuleInfo(moduleName)).filter(dep => dep != null);
+  protected async handleCommands(): Promise<void> {
+    let args = this._args;
 
-      return {
-        module,
-        dependencies: subDeps as ModuleInfo[]
-      }
-    });
+    switch (args.subCommand) {
+      case "list-modules":
+        await this.handleListModulesCommand();
+        break;
+
+      case "dependency-tree":
+        await this.handleDependencyTreeCommand();
+        break;
+
+      case "clean":
+        await this.handleCleanCommand();
+        break;
+
+      case "start":
+        await this.handleStartCommand();
+        break;
+
+      case "sync":
+        await this.handleSyncCommand();
+        break;
+
+      default:
+        throw new Error("Unknown command");
+    }
   }
 
-  async walkDependencyTree(modules: ModuleInfo[], walker: (module: ModuleInfo) => Promise<void>): Promise<void> {
-    let tree = this.getDependencyTree(modules);
 
-    const walkedModules: string[] = [];
+  public async start(): Promise<void> {
+    this.parseArgs();
 
-    const markWalked = (module: ModuleInfo) => {
-      if (walkedModules.indexOf(module.npmName.name) < 0) {
-        walkedModules.push(module.npmName.name);
-      }
-    };
+    this._config = Config.findAndLoadConfig(this._args.config || process.cwd(), this);
 
-    const isAlreadyWalked = (module: ModuleInfo) => {
-      return walkedModules.indexOf(module.npmName.name) >= 0;
-    };
-
-    const walkModule = async (module: ModuleInfoWithDeps, parents: string[]) => {
-      if (isAlreadyWalked(module.module)) {
-        return;
-      }
-
-      for (let dep of module.dependencies) {
-        if (parents.indexOf(dep.npmName.name) >= 0) {
-          // recursive dep
-          throw new Error(`Recursive dependency: ${dep.npmName.name}, required by ${parents.join(" -> ")}`);
-        }
-
-        let depWithDeps = tree.find(module => module.module.npmName.name === dep.npmName.name);
-        if (depWithDeps) {
-          await walkModule(depWithDeps, parents.concat([ module.module.npmName.name ]));
-        }
-      }
-
-      await walker(module.module);
-
-      markWalked(module.module);
-    };
-
-    for (let module of tree) {
-      await walkModule(module, []);
-    }
+    return this.handleCommands();
   }
 }
 
@@ -315,9 +344,7 @@ export class Norman {
 export function start(): void {
   let norman = new Norman();
 
-  norman.start().then(() => {
-
-  }, (error: Error) => {
+  norman.start().catch((error: Error) => {
     console.log(chalk.red(`Error: ${error.message}`));
     console.error(error);
   });

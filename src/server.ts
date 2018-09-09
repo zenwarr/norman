@@ -7,12 +7,13 @@ import * as path from "path";
 import * as url from "url";
 import * as ini from "ini";
 import {Norman} from "./norman";
-import {ModuleInfo} from "./config";
 import * as utils from "./utils";
 import chalk from "chalk";
 import * as contentType from "content-type";
 import * as crypto from "crypto";
-import {ModuleStateManager} from "./module-state-manager";
+import {ModuleInfo} from "./module-info";
+import {Base} from "./base";
+import {PACK_TAG} from "./module-state-manager";
 
 const accept = require("accept");
 
@@ -26,8 +27,8 @@ const TARBALL_CACHE_DIR = "/tmp/norman-cache";
 
 
 export type NpmConfig = {
-  registries: { [prefix: string]: string },
-  tokens: { [domain: string]: string },
+  registries: { [prefix: string]: string };
+  tokens: { [domain: string]: string };
   other: { [key: string]: any };
 };
 
@@ -38,44 +39,45 @@ export interface ModuleInfoWithDeps {
 }
 
 
-export class LocalNpmServer {
+export class LocalNpmServer extends Base {
   protected app: express.Application;
   protected npmConfig!: NpmConfig;
   protected myServerAddress: string;
   protected port: number;
-  protected server: http.Server|null = null;
+  protected server: http.Server | null = null;
 
 
-  constructor(protected norman: Norman, port: number = NPM_SERVER_PORT) {
+  public constructor(norman: Norman, port: number = NPM_SERVER_PORT) {
+    super(norman);
+
     this.port = port;
     this.myServerAddress = `http://localhost:${port}`;
 
     this.app = express();
 
     this.app.get("/tarballs/:package", (req, res) => {
+      // tslint:disable-next-line no-floating-promises
       this.onGetTarball(req.params.package, req, res);
     });
 
     this.app.get("/tarballs/:org/:package", (req, res) => {
+      // tslint:disable-next-line no-floating-promises
       this.onGetTarball(`${req.params.org}/${req.params.package}`, req, res);
     });
 
     this.app.get("/:package", (req, res) => {
+      // tslint:disable-next-line no-floating-promises
       this.onGetPackage(req.params.package, req, res);
     });
 
     this.app.get("/:org/:package", (req, res) => {
+      // tslint:disable-next-line no-floating-promises
       this.onGetPackage(`${req.params.org}/${req.params.package}`, req, res);
     });
   }
 
 
-  get config() {
-    return this.norman.config;
-  }
-
-
-  async start(): Promise<void> {
+  public async start(): Promise<void> {
     this.npmConfig = this.loadNpmConfig(this.config.mainConfigDir, ".npmrc");
 
     this.server = this.app.listen(NPM_SERVER_PORT);
@@ -84,7 +86,7 @@ export class LocalNpmServer {
   }
 
 
-  async stop(): Promise<void> {
+  public async stop(): Promise<void> {
     return new Promise<void>(resolve => {
       if (this.server) {
         this.server.close(() => {
@@ -98,7 +100,7 @@ export class LocalNpmServer {
   protected async onGetPackage(packageName: string, req: express.Request, res: express.Response): Promise<void> {
     let localModule = this.config.modules.find(module => module.npmName.name === packageName);
     if (localModule) {
-      let acceptedTypes: string[] = accept.mediaTypes(req.headers["accept"]);
+      let acceptedTypes: string[] = accept.mediaTypes(req.headers.accept);
       if (acceptedTypes.length && acceptedTypes[0] === "application/vnd.npm.install-v1+json") {
         let packument = await this.getLocalModuleAbbrPackument(localModule);
         res.set("content-type", acceptedTypes[0]);
@@ -116,7 +118,7 @@ export class LocalNpmServer {
 
         let token = this.getTokenForUrl(registry);
         if (token) {
-          headers["authorization"] = `Bearer ${token}`;
+          headers.authorization = `Bearer ${token}`;
         }
 
         if (registry.endsWith("/")) {
@@ -140,8 +142,8 @@ export class LocalNpmServer {
           }
 
           let responseHeaders = { ... response.headers };
-          delete responseHeaders['content-encoding'];
-          delete responseHeaders['transfer-encoding'];
+          delete responseHeaders["content-encoding"];
+          delete responseHeaders["transfer-encoding"];
 
           res.set(responseHeaders).send(JSON.stringify(json));
         } else {
@@ -161,7 +163,7 @@ export class LocalNpmServer {
 
   protected getRegistryForPackage(packageName: string): string {
     let org = packageName.startsWith("@") ? packageName.slice(0, packageName.indexOf("/")) : "";
-    let result = org ? this.npmConfig.registries[org] || this.npmConfig.registries["default"] : this.npmConfig.registries["default"];
+    let result = org ? this.npmConfig.registries[org] || this.npmConfig.registries.default : this.npmConfig.registries.default;
     if (!result) {
       throw new Error(`Npm registry for package ${packageName} not found`);
     }
@@ -169,7 +171,7 @@ export class LocalNpmServer {
   }
 
 
-  protected getTokenForUrl(registryUrl: string): string|null {
+  protected getTokenForUrl(registryUrl: string): string | null {
     let parsedUrl = url.parse(registryUrl);
     if (parsedUrl.host) {
       return this.npmConfig.tokens[parsedUrl.host] || null;
@@ -212,7 +214,7 @@ export class LocalNpmServer {
       versions: {
         [moduleVersion]: versionObject
       }
-    }
+    };
   }
 
 
@@ -220,24 +222,26 @@ export class LocalNpmServer {
     let localModule = this.config.modules.find(module => module.npmName.name === packageName);
     if (localModule) {
       try {
-        let stateManager = new ModuleStateManager(this.norman, localModule);
+        let stateManager = localModule.createStateManager();
         let actualState = await stateManager.loadActualState();
         let stateHash = stateManager.getStateHash(actualState);
 
         let archivePath: string;
 
         let packagedDirPath = path.join(TEMP_DIR, `${packageName}-${stateHash}`);
-        if (fs.existsSync(packagedDirPath)) {
-          archivePath = this.getArchivePathFromDir(localModule, packagedDirPath);
-        } else {
-          archivePath = await this.packModule(localModule, stateHash);
 
-          await stateManager.saveActualState();
+        let packager = localModule.createPackager();
+        if (fs.existsSync(packagedDirPath)) {
+          archivePath = packager.getArchivePathFromDir(packagedDirPath);
+        } else {
+          archivePath = await packager.pack(stateHash);
+
+          await stateManager.saveActualState(PACK_TAG);
         }
 
         res.sendFile(archivePath);
       } catch (error) {
-        console.log(error);
+        console.error(error);
       }
     } else {
       try {
@@ -251,7 +255,7 @@ export class LocalNpmServer {
 
         let token = this.getTokenForUrl(req.query.url);
         if (token) {
-          headers["authorization"] = `Bearer ${token}`;
+          headers.authorization = `Bearer ${token}`;
         }
 
         let response = await request.get(req.query.url, {
@@ -260,7 +264,7 @@ export class LocalNpmServer {
           encoding: null
         });
 
-        await this.cacheTarball(req.query.url, response.body);
+        this.cacheTarball(req.query.url, response.body);
 
         res.status(response.statusCode).set(response.headers).send(response.body);
       } catch (error) {
@@ -275,85 +279,24 @@ export class LocalNpmServer {
   }
 
 
-  protected pathForCachedTarball(url: string): string {
-    return path.join(TARBALL_CACHE_DIR, crypto.createHmac("sha256", "norman").update(url).digest('hex'));
+  protected pathForCachedTarball(tarballUrl: string): string {
+    return path.join(TARBALL_CACHE_DIR, crypto.createHmac("sha256", "norman").update(tarballUrl).digest("hex"));
   }
 
 
-  protected getCachedTarballPath(url: string): string|null {
-    let cachedPath = this.pathForCachedTarball(url);
+  protected getCachedTarballPath(tarballUrl: string): string | null {
+    let cachedPath = this.pathForCachedTarball(tarballUrl);
     return fs.existsSync(cachedPath) ? cachedPath : null;
   }
 
 
-  protected cacheTarball(url: string, data: Buffer): void {
+  protected cacheTarball(tarballUrl: string, data: Buffer): void {
     fs.mkdirpSync(TARBALL_CACHE_DIR);
-    fs.writeFileSync(this.pathForCachedTarball(url), data);
+    fs.writeFileSync(this.pathForCachedTarball(tarballUrl), data);
   }
 
 
-  protected isIgnored(module: ModuleInfo, filepath: string): boolean {
-    return filepath.endsWith(".tgz");
-  }
-
-
-  async packModule(module: ModuleInfo, stateHash: string): Promise<string> {
-    await this.norman.moduleFetcher.buildModuleIfChanged(module);
-
-    if (!fs.existsSync(TEMP_DIR)) {
-      fs.mkdirpSync(TEMP_DIR);
-    }
-
-    let tempDir = path.join(TEMP_DIR, `${module.npmName.name}-${stateHash}`);
-
-    await this.norman.appSynchronizer.walkModuleFiles(module, async (source, stat) => {
-      let relativeSourceFileName = path.relative(module.path, source);
-      if (relativeSourceFileName === ".gitignore" || relativeSourceFileName === ".npmignore") {
-        return;
-      }
-
-      let target = path.join(tempDir, path.relative(module.path, source));
-
-      if (module.ignoreInstance && module.ignoreInstance.ignores(source)) {
-        return;
-      }
-
-      let parentDestDir = path.dirname(target);
-      if (!fs.existsSync(parentDestDir)) {
-        fs.mkdirpSync(parentDestDir);
-      }
-
-      if (!stat.isDirectory()) {
-        fs.copyFileSync(source, target);
-      } else {
-        fs.mkdirpSync(target);
-      }
-    });
-
-    await utils.runCommand("npm", [ "pack" ], {
-      cwd: tempDir,
-      silent: true
-    });
-
-    return this.getArchivePathFromDir(module, tempDir);
-  }
-
-
-  protected getArchivePathFromDir(module: ModuleInfo, outPath: string): string {
-    let moduleVersion = fs.readJSONSync(path.join(outPath, "package.json")).version;
-
-    let archiveName: string;
-    if (module.npmName.org) {
-      archiveName = `${module.npmName.org}-${module.npmName.pkg}-${moduleVersion}.tgz`;
-    } else {
-      archiveName = `${module.npmName.pkg}-${moduleVersion}.tgz`;
-    }
-
-    return path.join(outPath, archiveName);
-  }
-
-
-  enterLocalInstall(module: ModuleInfo): void {
+  public enterLocalInstall(module: ModuleInfo): void {
     let newConfig: any = {
       registry: this.myServerAddress
     };
@@ -390,7 +333,7 @@ export class LocalNpmServer {
   }
 
 
-  exitLocalInstall(module: ModuleInfo): void {
+  public exitLocalInstall(module: ModuleInfo): void {
     let backupFilename = path.join(module.path, NPMRC_BACKUP_FILENAME);
     let npmrcFilename = path.join(module.path, ".npmrc");
 
@@ -424,7 +367,7 @@ export class LocalNpmServer {
 
   protected loadNpmConfig(dir: string, projectConfigFileName: string): NpmConfig {
     const loadNpmrc = (filename: string): NpmConfig => {
-      let npmrcText: string = "";
+      let npmrcText = "";
       try {
         npmrcText = fs.readFileSync(filename, { encoding: "utf-8" });
         console.log(`Loaded npm config from ${filename}`);
@@ -449,7 +392,7 @@ export class LocalNpmServer {
 
       for (let key of Object.keys(parsedConfig)) {
         if (key === "registry") {
-          npmConfig.registries["default"] = parsedConfig[key];
+          npmConfig.registries.default = parsedConfig[key];
         } else if (key.endsWith(":registry")) {
           npmConfig.registries[key.slice(0, key.indexOf(":"))] = parsedConfig[key];
         } else if (key.endsWith(":_authToken")) {
@@ -481,7 +424,7 @@ export class LocalNpmServer {
   }
 
 
-  async installLocalModule(installTo: ModuleInfo, moduleToInstall: ModuleInfo): Promise<void> {
+  public async installLocalModule(installTo: ModuleInfo, moduleToInstall: ModuleInfo): Promise<void> {
     await utils.cleanNpmCache();
 
     this.enterLocalInstall(installTo);
@@ -498,7 +441,7 @@ export class LocalNpmServer {
   }
 
 
-  async installModuleDeps(installTo: ModuleInfo): Promise<void> {
+  public async installModuleDeps(installTo: ModuleInfo): Promise<void> {
     await utils.cleanNpmCache();
 
     this.enterLocalInstall(installTo);
@@ -506,7 +449,7 @@ export class LocalNpmServer {
     try {
       await utils.runCommand("npm", [ "install" ], {
         cwd: installTo.path
-      })
+      });
     } finally {
       this.exitLocalInstall(installTo);
     }
@@ -515,12 +458,7 @@ export class LocalNpmServer {
   }
 
 
-  static cleanCache(): void {
+  public static cleanCache(): void {
     fs.removeSync(TARBALL_CACHE_DIR);
-  }
-
-
-  static cleanTemp(): void {
-    fs.removeSync(TEMP_DIR);
   }
 }

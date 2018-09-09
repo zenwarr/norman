@@ -29,7 +29,7 @@ All options are documented here.
 
 `modulesDirectory` (string, required): modules listed in `modules` are going to be cloned here by default.
 
-`defaultBranch` (string): default git branch to use when cloning modules if module branch is not given explicitly. `master` by default.
+`defaultBranch` (string): default git defaultBranch to use when cloning modules if module defaultBranch is not given explicitly. `master` by default.
 
 `defaultIgnoreOrg` (boolean): if `false`, module `@myorg/repo` is going to be cloned (if `modulesDirectory` is `/home/user/myproject`) as `/home/user/myproject/myorg/repo`.
 If `true`, sources are going to be cloned as `/home/user/myproject/repo`.
@@ -62,7 +62,7 @@ If directory where this repository should be cloned already exists, the reposito
 
 `module.ignoreOrg` (boolean): overrides value of `defaultIgnoreOrg` for the module.
 
-`module.branch` (string): overrides default git branch value from `defaultBranch`.
+`module.defaultBranch` (string): overrides default git defaultBranch value from `defaultBranch`.
 
 `module.npmIgnore` (string): overrides `defaultNpmIgnore` value for the module.
 

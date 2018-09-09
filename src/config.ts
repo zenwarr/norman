@@ -1,331 +1,266 @@
+import {ModuleInfo} from "./module-info";
 import * as path from "path";
-import * as fs from "fs-extra";
-import * as process from "process";
 import chalk from "chalk";
-import {IPluginClass, PackagePlugin, Plugin, SourceMapPlugin} from "./plugins";
-const ignore = require("ignore");
+import * as fs from "fs-extra";
+import {ModuleInfoWithDeps} from "./server";
+import * as utils from "./utils";
+import {Norman} from "./norman";
 
-const gitUrlParse = require("git-url-parse");
-
-export interface ModuleNpmName {
-  org: string;
-  pkg: string;
-  name: string;
-}
-
-export interface ModuleInfo {
-  name: string;
-  npmName: ModuleNpmName;
-  repository: string|null;
-  npmInstall: boolean;
-  buildCommands: string[];
-  branch: string;
-  path: string;
-  ignoreOrg: boolean;
-  npmIgnore: boolean|string;
-  ignoreInstance: any;
-  fetchDone: boolean;
-  installDone: boolean;
-  syncTargets: string[];
-  liveDeps: boolean;
-}
-
-const DEFAULT_MODULE_INFO: Partial<ModuleInfo> = {
-  npmInstall: true,
-  buildCommands: [],
-  fetchDone: false,
-  installDone: false,
-  ignoreInstance: null
-};
-
-export interface Config {
-  mainConfigDir: string;
-  modulesDirectory: string;
-  modules: ModuleInfo[];
-  defaultIgnoreOrg: boolean;
-  pluginClasses: IPluginClass[];
-  pluginInstances: Plugin[];
-  defaultNpmIgnore: boolean|string;
-}
-
-
-const DEFAULT_PLUGINS: IPluginClass[]  = [ SourceMapPlugin, PackagePlugin ];
-
-
-const DEFAULT_CONFIG: Partial<Config> = {
-  modules: [],
-  defaultIgnoreOrg: false,
-  pluginClasses: [ ],
-  pluginInstances: [ ],
-  defaultNpmIgnore: true
-};
 
 const CONFIG_FILE_NAME = ".norman.json";
 
 
-export function loadConfig(configPath: string|null): Config {
-  const findConfigForDir = (dir: string): string => {
-    if (!dir || dir === "/" || dir === ".") {
-      throw new Error(`No ${CONFIG_FILE_NAME} found in directory tree`);
-    }
-
-    let configLocation = path.join(dir, CONFIG_FILE_NAME);
-    if (fs.existsSync(configLocation)) {
-      return configLocation;
-    } else {
-      return findConfigForDir(path.dirname(dir));
-    }
-  };
+interface RawConfig {
+  modules?: any;
+  modulesDirectory?: any;
+  defaultNpmIgnore?: any;
+  defaultIgnoreOrg?: any;
+  includeModules?: any;
+  defaultBranch?: any;
+}
 
 
-  const loadConfig = (configLocation: string): Config => {
-    console.log(`Loading config file from ${configLocation}`);
+interface ConfigInit {
+  mainConfigDir: string;
+  mainModulesDir: string;
+  defaultIgnoreOrg: boolean;
+  defaultNpmIgnorePath: string | boolean;
+  defaultBranch: string;
+}
 
-    let configLocationDir = path.dirname(configLocation);
 
-    let rawConfig = fs.readFileSync(configLocation, {
-      encoding: "utf-8"
+export class Config {
+  private _mainConfigDir: string;
+  private _mainModulesDir: string;
+  private _defaultIgnoreOrg: boolean;
+  private _defaultNpmIgnoreHint: string | boolean;
+  private _modules: ModuleInfo[] = [];
+  private _defaultBranch: string;
+
+
+  public get mainConfigDir(): string { return this._mainConfigDir; }
+
+  public get mainModulesDir(): string { return this._mainModulesDir; }
+
+  public get defaultBranch(): string { return this._defaultBranch; }
+
+  public get defaultIgnoreOrg(): boolean { return this._defaultIgnoreOrg; }
+
+  public get defaultNpmIgnoreHint(): string | boolean { return this._defaultNpmIgnoreHint; }
+
+  public get modules(): ModuleInfo[] { return this._modules; }
+
+
+  public constructor(init: ConfigInit) {
+    this._mainConfigDir = init.mainConfigDir;
+    this._mainModulesDir = init.mainModulesDir;
+    this._defaultIgnoreOrg = init.defaultIgnoreOrg;
+    this._defaultNpmIgnoreHint = init.defaultNpmIgnorePath;
+    this._defaultBranch = init.defaultBranch;
+  }
+
+
+  public getModuleInfo(moduleName: string): ModuleInfo | null {
+    return this._modules.find(module => module.name === moduleName) || null;
+  }
+
+
+  public getDependencyTree(modules: ModuleInfo[]): ModuleInfoWithDeps[] {
+    return modules.map(module => {
+      let subDeps = utils.getPackageDeps(module.path).map(moduleName => this.getModuleInfo(moduleName)).filter(dep => dep != null);
+
+      return {
+        module,
+        dependencies: subDeps as ModuleInfo[]
+      };
     });
+  }
 
-    let config: any;
-    try {
-      config = Object.assign({}, DEFAULT_CONFIG, JSON.parse(rawConfig));
-    } catch (error) {
-      // invalid config, stop here
-      throw new Error(`Invalid config file ${configLocation}: ${error.message}`);
-    }
 
-    config.mainConfigDir = configLocationDir;
+  public async walkDependencyTree(modules: ModuleInfo[], walker: (module: ModuleInfo) => Promise<void>): Promise<void> {
+    let tree = this.getDependencyTree(modules);
 
-    if (!config.modulesDirectory) {
-      throw new Error(`No valid "modulesDirectory" option found in configuration file loaded from ${configLocation}`);
-    }
+    const walkedModules: string[] = [];
 
-    // make modulesDirectory absolute
-    if (!path.isAbsolute(config.modulesDirectory)) {
-      config.modulesDirectory = path.resolve(configLocationDir, config.modulesDirectory);
-    }
+    const markWalked = (module: ModuleInfo) => {
+      if (walkedModules.indexOf(module.npmName.name) < 0) {
+        walkedModules.push(module.npmName.name);
+      }
+    };
 
-    // build module list from urls
-    config.modules = config.modules.map(moduleFromConfig.bind(null, config, configLocation));
+    const isAlreadyWalked = (module: ModuleInfo) => {
+      return walkedModules.indexOf(module.npmName.name) >= 0;
+    };
 
-    if (config.includeModules) {
-      let includeModules = Array.isArray(config.includeModules) ? config.includeModules : [ config.includeModules ];
-      for (let includeConfig of includeModules) {
-        if (!path.isAbsolute(includeConfig)) {
-          includeConfig = path.resolve(configLocationDir, includeConfig);
+    const walkModule = async(module: ModuleInfoWithDeps, parents: string[]) => {
+      if (isAlreadyWalked(module.module)) {
+        return;
+      }
+
+      for (let dep of module.dependencies) {
+        if (parents.indexOf(dep.npmName.name) >= 0) {
+          // recursive dep
+          throw new Error(`Recursive dependency: ${dep.npmName.name}, required by ${parents.join(" -> ")}`);
         }
+
+        let depWithDeps = tree.find(mod => mod.module.npmName.name === dep.npmName.name);
+        if (depWithDeps) {
+          await walkModule(depWithDeps, parents.concat([ module.module.npmName.name ]));
+        }
+      }
+
+      await walker(module.module);
+
+      markWalked(module.module);
+    };
+
+    for (let module of tree) {
+      await walkModule(module, []);
+    }
+  }
+
+
+  public static loadConfig(configFilename: string, rawConfig: RawConfig, isMainConfig: boolean, norman: Norman): Config {
+    let mainConfigDir = path.dirname(configFilename);
+
+    let mainModulesDir: string;
+    if (rawConfig.modulesDirectory == null || typeof rawConfig.modulesDirectory !== "string") {
+      throw new Error("'modulesDirectory' should be a string");
+    } else {
+      if (!path.isAbsolute(rawConfig.modulesDirectory)) {
+        mainModulesDir = path.resolve(mainConfigDir, rawConfig.modulesDirectory);
+      } else {
+        mainModulesDir = rawConfig.modulesDirectory;
+      }
+    }
+
+    let defaultIgnoreOrg = false;
+    if ("defaultIgnoreOrg" in rawConfig) {
+      if (typeof rawConfig.defaultIgnoreOrg !== "boolean") {
+        throw new Error("'defaultIgnoreOrg' should be a boolean");
+      }
+      defaultIgnoreOrg = rawConfig.defaultIgnoreOrg;
+    }
+
+    let defaultNpmIgnorePath: string | boolean = true;
+    if ("defaultNpmIgnore" in rawConfig) {
+      if (typeof rawConfig.defaultNpmIgnore !== "string" && typeof rawConfig.defaultNpmIgnore !== "boolean") {
+        throw new Error("'defaultNpmIgnoreHint' should be a string or a boolean");
+      }
+      defaultNpmIgnorePath = rawConfig.defaultNpmIgnore;
+    }
+
+    let defaultBranch = "master";
+    if ("defaultBranch" in rawConfig) {
+      if (typeof rawConfig.defaultBranch !== "string") {
+        throw new Error("'defaultBranch' should be a string");
+      }
+      defaultBranch = rawConfig.defaultBranch;
+    }
+
+    let appConfig = new Config({ mainConfigDir, mainModulesDir, defaultIgnoreOrg, defaultNpmIgnorePath, defaultBranch });
+
+    appConfig._modules = this.loadModules(configFilename, rawConfig, appConfig, isMainConfig, norman);
+
+    return appConfig;
+  }
+
+
+  private static loadModules(configFilename: string, rawConfig: RawConfig, appConfig: Config, isMainConfig: boolean, norman: Norman): ModuleInfo[] {
+    let mainConfigDir = path.dirname(configFilename);
+
+    let modules: ModuleInfo[] = [];
+    if ("includeModules" in rawConfig) {
+      if (!Array.isArray(rawConfig.includeModules)) {
+        throw new Error("'includeModules' should be an array");
+      }
+      for (let configPath of rawConfig.includeModules) {
+        if (typeof configPath !== "string") {
+          throw new Error("'includeModules' should be an array of strings");
+        }
+
+        if (!path.isAbsolute(configPath)) {
+          configPath = path.resolve(mainConfigDir, configPath);
+        }
+
         try {
-          let extraModules = loadModulesFromConfig(includeConfig).filter(extraModule => {
-            // ignore conflicting modules
-            if (config.modules.find((module: ModuleInfo) => module.repository === extraModule.repository) != null) {
-              console.log(chalk.yellow(`Ignoring module "${extraModule.repository}" because it has been already loaded`));
+          let config = Config.loadConfigFromFile(configPath, false, norman);
+
+          let extraModules = config._modules.filter(extraModule => {
+            if (modules.find(module => module.name === extraModule.name)) {
+              console.log(chalk.yellow(`Ignoring module "${extraModule.name}" because it has been already loaded`));
               return false;
             }
             return true;
           });
-          config.modules = config.modules.concat(extraModules);
+
+          modules = modules.concat(extraModules);
         } catch (error) {
-          throw new Error(`Failed to include modules from config at "${includeConfig}" (while parsing config at "${configLocation}": ${error.message}`);
+          throw new Error(`Failed to include modules from config at "${configPath}" (while parsing config at "${configFilename}": ${error.message}`);
         }
       }
     }
 
-    // add default app module
-    if (config.modules.find((module: ModuleInfo) => module.path === config.mainConfigDir) == null) {
-      let moduleInfo: ModuleInfo;
+    if ("modules" in rawConfig) {
+      if (!Array.isArray(rawConfig.modules)) {
+        throw new Error("'modules' should be an array");
+      }
 
-      let packageJsonPath = path.join(config.mainConfigDir, "package.json");
-      if (fs.existsSync(packageJsonPath)) {
-        let pkg = fs.readJSONSync(packageJsonPath);
-
-        let pkgName= pkg.name;
-        let npmName: ModuleNpmName;
-        if (pkgName.indexOf("/") >= 0) {
-          npmName = {
-            org: pkgName.slice(0, pkgName.indexOf("/")),
-            pkg: pkgName.slice(pkgName.indexOf("/") + 1),
-            name: pkgName
-          }
-        } else {
-          npmName = {
-            org: "",
-            pkg: pkgName,
-            name: pkgName
-          }
+      for (let rawModule of rawConfig.modules) {
+        if (!rawModule || typeof rawModule !== "object") {
+          throw new Error("'modules' should be an array of objects");
         }
 
-        moduleInfo = {
-          name: pkg.name,
-          npmName,
-          repository: null,
-          npmInstall: true,
-          buildCommands: [],
-          branch: config.defaultBranch,
-          path: config.mainConfigDir,
-          ignoreOrg: config.defaultIgnoreOrg,
-          npmIgnore: config.defaultNpmIgnore,
-          ignoreInstance: null,
-          fetchDone: true,
-          installDone: false,
-          syncTargets: [],
-          liveDeps: true
-        };
-
-        moduleInfo.ignoreInstance = createIgnoreInstanceForModule(moduleInfo);
-
-        config.modules.push(moduleInfo);
+        modules.push(ModuleInfo.createFromConfig(rawModule, appConfig, norman));
       }
     }
 
-    // register plugins
-    for (let pluginModule of config.plugins || []) {
-      registerPlugin(config, pluginModule);
-    }
-
-    config.pluginClasses = config.pluginClasses.concat(DEFAULT_PLUGINS);
-
-    return config;
-  };
-
-
-  if (configPath) {
-    if (fs.statSync(configPath).isDirectory()) {
-      configPath = path.join(configPath, CONFIG_FILE_NAME);
-    }
-    return loadConfig(configPath);
-  } else {
-    return loadConfig(findConfigForDir(process.cwd()));
-  }
-}
-
-
-function createIgnoreInstanceForModule(module: ModuleInfo): any {
-  let resolvedIgnorePath: string|null = null;
-
-  if (typeof module.npmIgnore === "boolean") {
-    let ignorePath = path.join(module.path, ".npmignore");
-    if (fs.existsSync(ignorePath)) {
-      resolvedIgnorePath = ignorePath;
-    }
-  } else {
-    resolvedIgnorePath = module.npmIgnore;
-  }
-
-  if (!resolvedIgnorePath) {
-    return null;
-  }
-
-  let ignoreInstance = ignore();
-  ignoreInstance.add(fs.readFileSync(resolvedIgnorePath, "utf-8"));
-  return ignoreInstance;
-}
-
-
-function moduleFromConfig(inputConfig: any, configLocation: string, moduleConfig: any): ModuleInfo {
-  let branch = moduleConfig.branch || inputConfig.defaultBranch || "master";
-
-  let fullName = gitUrlParse(moduleConfig.repository).full_name;
-  if (!moduleConfig.name) {
-    moduleConfig.name = fullName;
-  }
-
-  moduleConfig.branch = branch;
-
-  if (!moduleConfig.npmName) {
-    moduleConfig.npmName = npmNameFromPackageName(moduleConfig.name);
-  }
-
-  if (moduleConfig.ignoreOrg == null) {
-    moduleConfig.ignoreOrg = inputConfig.defaultIgnoreOrg != null ? inputConfig.defaultIgnoreOrg : false;
-  }
-
-  if (moduleConfig.npmIgnore == null) {
-    moduleConfig.npmIgnore = inputConfig.defaultNpmIgnore != null ? inputConfig.defaultNpmIgnore : true;
-    if (typeof moduleConfig.npmIgnore === "string") {
-      if (!path.isAbsolute(moduleConfig.npmIgnore)) {
-        moduleConfig.npmIgnore = path.resolve(path.dirname(configLocation), moduleConfig.npmIgnore);
+    if (isMainConfig && !this.hasImplicitModule(modules, mainConfigDir)) {
+      let implicitModule = ModuleInfo.createImplicit(mainConfigDir, appConfig, norman);
+      if (implicitModule) {
+        modules.push(implicitModule);
       }
     }
+
+    return modules;
   }
 
-  if (!moduleConfig.path) {
-    moduleConfig.path = path.join(inputConfig.modulesDirectory, moduleConfig.ignoreOrg ? moduleConfig.npmName.pkg : fullName);
-  } else if (!path.isAbsolute(moduleConfig.path)) {
-    throw new Error(`Path for module ${fullName} has to be absolute: ${moduleConfig.path}`);
+
+  private static hasImplicitModule(modules: ModuleInfo[], mainConfigDir: string): boolean {
+    return modules.find(module => module.name === mainConfigDir) != null;
   }
 
-  moduleConfig.liveDeps = true;
 
-  moduleConfig.ignoreInstance = createIgnoreInstanceForModule(moduleConfig);
+  public static findAndLoadConfig(startDir: string, norman: Norman): Config {
+    const findConfigForDir = (dir: string): string => {
+      if (!dir || dir === "/" || dir === ".") {
+        throw new Error(`No ${CONFIG_FILE_NAME} found in directory tree`);
+      }
 
-  return Object.assign({}, DEFAULT_MODULE_INFO, moduleConfig);
-}
+      let configLocation = path.join(dir, CONFIG_FILE_NAME);
+      if (fs.existsSync(configLocation)) {
+        return configLocation;
+      } else {
+        return findConfigForDir(path.dirname(dir));
+      }
+    };
 
-
-function npmNameFromPackageName(name: string): ModuleNpmName {
-  if (name.indexOf("/") > 0) {
-    let [ org, pkg ] = name.split("/");
-    return { org, pkg, name: `@${org}/${pkg}` };
-  } else {
-    return { org: "", pkg: name, name };
-  }
-}
-
-
-function loadModulesFromConfig(file: string): ModuleInfo[] {
-  if (fs.statSync(file).isDirectory()) {
-    file = path.join(file, CONFIG_FILE_NAME);
+    return this.loadConfigFromFile(findConfigForDir(startDir), true, norman);
   }
 
-  let rawConfig = fs.readFileSync(file, {
-    encoding: "utf-8"
-  });
 
-  let config: any;
-  try {
-    config = Object.assign({}, DEFAULT_CONFIG, JSON.parse(rawConfig));
-  } catch (error) {
-    // invalid config, stop here
-    throw new Error(`Invalid config file ${file}: ${error.message}`);
-  }
+  public static loadConfigFromFile(filename: string, isMainConfig: boolean, norman: Norman): Config {
+    console.log(`Loading config file from ${filename}`);
 
-  // register plugins
-  for (let pluginModule of config.plugins || []) {
-    registerPlugin(config, pluginModule);
-  }
+    let rawConfig = fs.readFileSync(filename, {
+      encoding: "utf-8"
+    });
 
-  if (!config.modulesDirectory) {
-    throw new Error(`No valid "modulesDirectory" option found in configuration file loaded from ${file}`);
-  }
-
-  // make modulesDirectory absolute
-  if (!path.isAbsolute(config.modulesDirectory)) {
-    config.modulesDirectory = path.resolve(path.dirname(file), config.modulesDirectory);
-  }
-
-  // build module list from urls
-  return config.modules.map(moduleFromConfig.bind(null, config, file));
-}
-
-
-function registerPlugin(config: Config, moduleName: string): void {
-  if (!moduleName) {
-    return;
-  }
-
-  if (moduleName.indexOf("/") < 0 && !moduleName.startsWith("@")) {
-    if (!moduleName.startsWith("node-norman-")) {
-      moduleName = "node-norman-" + moduleName;
+    try {
+      return this.loadConfig(filename, JSON.parse(rawConfig), true, norman);
+    } catch (error) {
+      // invalid config, stop here
+      throw new Error(`Invalid config file ${filename}: ${error.message}`);
     }
   }
-
-  console.log(`Loading plugin ${moduleName}...`);
-
-  let module = require(moduleName);
-  if (!module.default) {
-    throw new Error(`Failed to import transformer module ${moduleName}: use "export default" to export plugin class`);
-  }
-
-  config.pluginClasses.push(module.default);
 }
