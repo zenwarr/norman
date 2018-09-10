@@ -151,7 +151,6 @@ export class Norman {
     }
 
     process.exit(0);
-    return;
   }
 
 
@@ -163,7 +162,6 @@ export class Norman {
     console.log(chalk.green("-- END MODULES LIST"));
 
     process.exit(0);
-    return;
   }
 
 
@@ -202,7 +200,6 @@ export class Norman {
     console.log(chalk.green("-- END WALK ORDER"));
 
     process.exit(0);
-    return;
   }
 
 
@@ -340,3 +337,14 @@ export function start(): void {
     console.error(error);
   });
 }
+
+
+process.on("uncaughtException", (error) => {
+  console.log(chalk.red(`UNHANDLED EXCEPTION: ${error.message}: ${error.stack}`));
+  process.exit(-1);
+});
+
+process.on("unhandledRejection", (error) => {
+  console.log(chalk.red(`UNHANDLED REJECTION: ${error.message}: ${error.stack}`));
+  process.exit(-1);
+});

@@ -19,8 +19,6 @@ const accept = require("accept");
 
 
 const NPM_SERVER_PORT = 5001;
-const NPMRC_BACKUP_FILENAME = ".npmrc-norman-backup";
-const LOCKFILE_BACKUP_FILENAME = "package-lock.norman-backup.json";
 
 const TEMP_DIR = "/tmp/norman";
 const TARBALL_CACHE_DIR = "/tmp/norman-cache";
@@ -296,72 +294,18 @@ export class LocalNpmServer extends Base {
   }
 
 
-  public enterLocalInstall(module: ModuleInfo): void {
-    let newConfig: any = {
-      registry: this.myServerAddress
-    };
+  public buildNpmEnv(module: ModuleInfo): NodeJS.ProcessEnv {
+    let result = process.env;
+
     for (let key of Object.keys(this.npmConfig.registries)) {
       if (key !== "default") {
-        newConfig[`${key}:registry`] = this.myServerAddress;
+        result[`npm_config_${key}:registry`] = this.myServerAddress;
       }
     }
 
-    for (let key of Object.keys(this.npmConfig.other)) {
-      newConfig[key] = this.npmConfig.other[key];
-    }
+    result["npm_config_package-lock"] = "false";
 
-    newConfig["package-lock"] = false;
-
-    let npmrcFilename = path.join(module.path, ".npmrc");
-    let backupFilename = path.join(module.path, NPMRC_BACKUP_FILENAME);
-    if (fs.existsSync(npmrcFilename)) {
-      fs.copyFileSync(npmrcFilename, backupFilename);
-    }
-
-    fs.writeFileSync(path.join(module.path, ".npmrc"), ini.stringify(newConfig), { encoding: "utf-8" });
-
-    let lockFilename = path.join(module.path, "package-lock.json"),
-        lockBackupFilename = path.join(module.path, LOCKFILE_BACKUP_FILENAME);
-    try {
-      fs.copyFileSync(lockFilename, lockBackupFilename);
-      fs.unlinkSync(lockFilename);
-    } catch (error) {
-      if (error.code !== "ENOENT") {
-        throw error;
-      }
-    }
-  }
-
-
-  public exitLocalInstall(module: ModuleInfo): void {
-    let backupFilename = path.join(module.path, NPMRC_BACKUP_FILENAME);
-    let npmrcFilename = path.join(module.path, ".npmrc");
-
-    try {
-      if (!fs.existsSync(backupFilename)) {
-        fs.removeSync(npmrcFilename);
-      } else {
-        fs.copyFileSync(backupFilename, npmrcFilename);
-        fs.removeSync(backupFilename);
-      }
-      console.log(`.npmrc for project ${module.name} is restored`);
-    } catch (error) {
-      if (error.code !== "ENOENT") {
-        throw error;
-      }
-    }
-
-    let lockFilename = path.join(module.path, "package-lock.json"),
-        lockBackupFilename = path.join(module.path, LOCKFILE_BACKUP_FILENAME);
-
-    try {
-      fs.copyFileSync(lockBackupFilename, lockFilename);
-      fs.unlinkSync(lockBackupFilename);
-    } catch (error) {
-      if (error.code !== "ENOENT") {
-        throw error;
-      }
-    }
+    return result;
   }
 
 
@@ -427,15 +371,17 @@ export class LocalNpmServer extends Base {
   public async installModuleDeps(installTo: ModuleInfo): Promise<void> {
     await utils.cleanNpmCache();
 
-    this.enterLocalInstall(installTo);
+    let npmEnv = this.buildNpmEnv(installTo);
 
-    try {
-      await utils.runCommand("npm", [ "install" ], {
-        cwd: installTo.path
-      });
-    } finally {
-      this.exitLocalInstall(installTo);
-    }
+    await utils.runCommand("npm", [ "install" ], {
+      cwd: installTo.path,
+      env: npmEnv
+    });
+
+    await utils.runCommand("npm", [ "prune "], {
+      cwd: installTo.path,
+      env: npmEnv
+    });
 
     await utils.cleanNpmCache();
   }

@@ -87,12 +87,7 @@ If directory where this repository should be cloned already exists, the reposito
 # Troubleshooting
 
 Norman uses local NPM registry server internally that dynamically builds and packs local modules.
-To make npm fetch packages from the local server, `norman` has to modify `.npmrc` file in a local module directory.
-It does that only before running `npm install` commands in target directory, and restores existing `.npmrc` after the command finishes.
-But if anything goes wrong, for example, if `norman` crashes during installing dependencies, the modified `.npmrc` can stay in source directory, breaking the ability to use `npm`.
-In this case, you can simply remove `.npmrc` file and restore original `.npmrc` from backup (`.npmrc-norman-backup` file is created by norman in the same directory).
-
-The local npm server also acts like a proxy to original npm registries and caches tarballs fetched from these registries.
+The local npm server acts like a proxy to original npm registries and caches tarballs fetched from these registries.
 If you have any problems with cached tarballs, run `norman clean cache`.
 
 Norman also stores snapshots of local module state in `~/.norman-state` directory to determine whether it should repack or rebuild requested local module instead of using an already packed version.
