@@ -124,14 +124,17 @@ export class Config {
     let mainConfigDir = path.dirname(configFilename);
 
     let mainModulesDir: string;
-    if (rawConfig.modulesDirectory == null || typeof rawConfig.modulesDirectory !== "string") {
-      throw new Error("'modulesDirectory' should be a string");
-    } else {
+    if ("modulesDirectory" in rawConfig) {
+      if (typeof rawConfig.modulesDirectory !== "string") {
+        throw new Error("`modulesDirectory' should be a string");
+      }
       if (!path.isAbsolute(rawConfig.modulesDirectory)) {
         mainModulesDir = path.resolve(mainConfigDir, rawConfig.modulesDirectory);
       } else {
         mainModulesDir = rawConfig.modulesDirectory;
       }
+    } else {
+      mainModulesDir = mainConfigDir;
     }
 
     let defaultIgnoreOrg = false;
