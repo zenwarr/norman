@@ -29,7 +29,11 @@ The directory layout matches the one you get by running `npm install` for your m
 
 To sync a module, run `norman sync app`, where the last argument is either name of the module as specified in the config, or a path to module source directory.
 
-You can use a watcher and synchronize a module on-the-fly by adding `--watch`: `norman sync --watch app`
+You can use a watcher and synchronize a module on-the-fly by adding `--watch`: `norman sync --watch app`.
+
+Note that norman does not rebuild local modules in watch mode, it only synchronizes files.
+
+But you can rebuild dependent modules on regular sync with `--build-deps` flag.
 
 # `.norman.json` file
 
@@ -57,7 +61,7 @@ Each item should be an object, properties of this objects are documented below u
 
 `module.repository` (string): url to repository to clone module source from.
 This field is required.
-Package name is deducted from the path.
+Package name is deducted from this value.
 If directory where this repository should be cloned already exists, the repository is not going to be cloned.
 
 `module.path` (string): overrides path to cloned repository for the module (deducted by default from `modulesDirectory`).
@@ -67,6 +71,9 @@ If directory where this repository should be cloned already exists, the reposito
 `module.defaultBranch` (string): overrides default git defaultBranch value from `defaultBranch`.
 
 `module.npmIgnore` (string): overrides `defaultNpmIgnore` value for the module.
+
+If the directory where this config is located is itself a npm package (e. g. `package.json` exists), an implicit module is created for this package with name loaded from `package.json` and without a remote repository set.
+An implicit module is created only for the directory with main config file (configs loaded with `includeModules` do not create implicit modules).
 
 # Example config
 
