@@ -1,6 +1,6 @@
 # What is it?
 
-An extensible tool that helps to develop multi-package Node.js apps.
+A tool that helps to develop multi-package Node.js apps.
 
 # Why not use `npm link` instead?
 
@@ -9,19 +9,27 @@ An extensible tool that helps to develop multi-package Node.js apps.
 2. In general case, you cannot have `node_modules` directory inside a linked package, because the package does not know it was linked somewhere.
    When the linked package requires another package, it first looks for it in its own `node_modules`, not in `node_modules` of the application it was linked to.
    In most cases it does work, but some packages (especially ones that use singleton instances) are not happy to be imported that way.
+3. You develop with packages layout that differs from the layout you application gets when installed in production.
+4. Circular linked dependencies is still pain for many tools.
 
-# How does it work?
+# How to start?
 
 1. Install: `npm i -g node-norman`
 2. Create `.norman.json` configuration file for your application and list modules you want to develop (see below).
-3. Run `npm install` in your application home directory.
-4. Run `norman` in in directory where `.norman.json` is located.
-5. Norman will clone source code from repos, optionally making `npm install` for cloned sources and running build commands.
-6. Cloned sources are going to be relinked: if a cloned module `A` has a dependency on another cloned module `B`, the installed copy of `B` in `A/node_modules/B` is going to be replaced with soft link to `B`.
-7. Cloned modules are synchronized into `node_modules` of your application.
-  Files are not soft- or hard-linked, but copied into `APP/node_modules`.
-  Only modules that already exists in app's `node_modules` are going to be synchronized.
-8. Cloned modules are watched for changes, changes in non-ignored files are synchronized into `APP/node_modules`.
+4. Run `norman fetch` in in directory where `.norman.json` is located (or give path to config file with `norman --config ~/project/.norman.json fetch`).
+5. Norman is going to initialize local modules by cloning source code from repos, optionally making `npm install` and running build commands.
+
+Now you are able to synchronize local modules.
+For example, you develop an application in module named `app`, which depends on modules `a` and `b` that you also want to modify.
+To start the app, you should have actual versions of modules `a` and `b` in `app/node_modules`.
+Without norman you could create symlinks in `app/node_modules` pointing to `a` and `b` source directories.
+But with norman you should synchronize `app` module before running.
+Synchronizing ensures that you have actual versions of all local dependencies in app directory.
+The directory layout matches the one you get by running `npm install` for your module and fetching all dependencies with npm.
+
+To sync a module, run `norman sync app`, where the last argument is either name of the module as specified in the config, or a path to module source directory.
+
+You can use a watcher and synchronize a module on-the-fly by adding `--watch`: `norman sync --watch app`
 
 # `.norman.json` file
 
@@ -34,12 +42,6 @@ All options are documented here.
 `defaultIgnoreOrg` (boolean): if `false`, module `@myorg/repo` is going to be cloned (if `modulesDirectory` is `/home/user/myproject`) as `/home/user/myproject/myorg/repo`.
 If `true`, sources are going to be cloned as `/home/user/myproject/repo`.
 Default is `false`.
-
-`installMissingAppDeps` (boolean). When you do `npm install --save` in any module being watched, `norman` detects it and checks dependencies of your module for conflicts with modules installed into application `node_modules` directory.
-If the package you added to your module is not installed in app `node_modules`, `norman` will try to install it (dependency is not going to be saved into app `package.json`), but only if `installMissingAppDeps` is `true`.
-
-`plugins` (string[]): list of plugins to be loaded.
-If the plugin is published as `node-norman-some-plugin` on `npm`, you should add `some-plugin` to this list (but if plugin is published in npm organization, or it is a local file, specify a full name).
 
 `includeModules` (string or string[]): path (can be relative to the location of current config file) to another config file.
 Modules from this config are going to be loaded too (taking into account `modulesDirectory` and other module-affecting options from loaded config).
@@ -66,17 +68,6 @@ If directory where this repository should be cloned already exists, the reposito
 
 `module.npmIgnore` (string): overrides `defaultNpmIgnore` value for the module.
 
-`module.relink` (boolean): if `false`, do not relink another packages into this module's `node_modules`.
-
-`app` (object): Object containing app configuration.
-Its properties are documented below under `app.*` keys.
-
-`app.home` (string): optional, path to directory of application home (where app `package.json` lives).
-If empty, the directory with `.norman.json` file is used.
-
-`app.forceModules` (string[]): by default, `norman` synchronizes only modules that were already installed into app `node_modules` during initial `npm install`).
-You can list any module here to synchronize it regardless of directory existence.
-
 # Example config
 
 ```json
@@ -84,34 +75,27 @@ You can list any module here to synchronize it regardless of directory existence
   "modulesDirectory": "/home/user/development/myproject",
   "defaultBranch": "alpha",
   "defaultIgnoreOrg": true,
-  "installMissingAppDeps": true,
-  "plugins": [
-    "coffee-script"
-  ],
   "modules": [
     {
       "repository": "git@github.com:zenwarr/norman.git",
       "branch": "alpha"
     }
-  ],
-  "app": {
-    "home": "/home/user/apps/myproject"
-  }
+  ]
 }
 ```
 
-# Source map support
+# Troubleshooting
 
-By default, `norman` transforms source maps it synchronizes to point to locations in your source code directory.
+Norman uses local NPM registry server internally that dynamically builds and packs local modules.
+To make npm fetch packages from the local server, `norman` has to modify `.npmrc` file in a local module directory.
+It does that only before running `npm install` commands in target directory, and restores existing `.npmrc` after the command finishes.
+But if anything goes wrong, for example, if `norman` crashes during installing dependencies, the modified `.npmrc` can stay in source directory, breaking the ability to use `npm`.
+In this case, you can simply remove `.npmrc` file and restore original `.npmrc` from backup (`.npmrc-norman-backup` file is created by norman in the same directory).
 
-# Plugins
+The local npm server also acts like a proxy to original npm registries and caches tarballs fetched from these registries.
+If you have any problems with cached tarballs, run `norman clean cache`.
 
-Currently there is only one plugin, `node-norman-coffee-script`.
-It transpiles `.coffee` files on-the-fly (you are going to have `.coffee` files in source directory and compiled `.js` and `js.map` files in `APP/node_modules` (coffee 1.x is used).
+Norman also stores snapshots of local module state in `~/.norman-state` directory to determine whether it should repack or rebuild requested local module instead of using an already packed version.
+You can clean stored state by running `norman clean state`.
 
-# Command-line interface reference
-
-`--config`: Path to config file or a directory containing config file named `.norman.json`.
-`--watch`: Watches for changes in local modules and automatically synchronizes all modules.
-`sync ~/projects/myapp/moduleA`
-`sync ~/projects/myapp/moduleA --build-deps`
+To clean everything, including temp files containing packed versions of local modules, run `norman clean all`.
