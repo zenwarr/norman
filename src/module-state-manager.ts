@@ -32,7 +32,7 @@ export class ModuleStateManager extends ModuleBase {
     });
 
     return {
-      module: this.module.npmName.name,
+      module: this.module.name,
       timestamp: (new Date()).valueOf(),
       files: resultFiles
     };
@@ -81,7 +81,7 @@ export class ModuleStateManager extends ModuleBase {
     }
 
     for (let entry of data as ModuleState[]) {
-      if (entry.module === this.module.npmName.name) {
+      if (entry.module === this.module.name) {
         return entry;
       }
     }
@@ -119,7 +119,7 @@ export class ModuleStateManager extends ModuleBase {
     let data = stateForTag.data;
 
     for (let q = 0; q < data.length; ++q) {
-      if (data[q].module === this.module.npmName.name) {
+      if (data[q].module === this.module.name) {
         data[q] = state;
         existingStateFound = true;
         break;
@@ -165,7 +165,7 @@ export class ModuleStateManager extends ModuleBase {
     let files = Object.keys(prevState.files);
     for (let filename of files) {
       if (!currentState.files[filename] || currentState.files[filename] > prevState.files[filename]) {
-        console.log(`module ${this.module.npmName.name} changed, file ${filename}`);
+        console.log(`module ${this.module.name} changed, file ${filename}`);
         return true;
       }
     }

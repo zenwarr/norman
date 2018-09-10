@@ -83,13 +83,13 @@ export class Config {
     const walkedModules: string[] = [];
 
     const markWalked = (module: ModuleInfo) => {
-      if (walkedModules.indexOf(module.npmName.name) < 0) {
-        walkedModules.push(module.npmName.name);
+      if (walkedModules.indexOf(module.name) < 0) {
+        walkedModules.push(module.name);
       }
     };
 
     const isAlreadyWalked = (module: ModuleInfo) => {
-      return walkedModules.indexOf(module.npmName.name) >= 0;
+      return walkedModules.indexOf(module.name) >= 0;
     };
 
     const walkModule = async(module: ModuleInfoWithDeps, parents: string[]) => {
@@ -98,14 +98,14 @@ export class Config {
       }
 
       for (let dep of module.dependencies) {
-        if (parents.indexOf(dep.npmName.name) >= 0) {
+        if (parents.indexOf(dep.name) >= 0) {
           // recursive dep
-          throw new Error(`Recursive dependency: ${dep.npmName.name}, required by ${parents.join(" -> ")}`);
+          throw new Error(`Recursive dependency: ${dep.name}, required by ${parents.join(" -> ")}`);
         }
 
-        let depWithDeps = tree.find(mod => mod.module.npmName.name === dep.npmName.name);
+        let depWithDeps = tree.find(mod => mod.module.name === dep.name);
         if (depWithDeps) {
-          await walkModule(depWithDeps, parents.concat([ module.module.npmName.name ]));
+          await walkModule(depWithDeps, parents.concat([ module.module.name ]));
         }
       }
 

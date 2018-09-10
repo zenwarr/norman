@@ -98,7 +98,7 @@ export class LocalNpmServer extends Base {
 
 
   protected async onGetPackage(packageName: string, req: express.Request, res: express.Response): Promise<void> {
-    let localModule = this.config.modules.find(module => module.npmName.name === packageName);
+    let localModule = this.config.modules.find(module => module.name === packageName);
     if (localModule) {
       let acceptedTypes: string[] = accept.mediaTypes(req.headers.accept);
       if (acceptedTypes.length && acceptedTypes[0] === "application/vnd.npm.install-v1+json") {
@@ -190,12 +190,12 @@ export class LocalNpmServer extends Base {
     let moduleVersion: string = moduleMeta.version;
 
     let versionObject: any = {
-      name: module.npmName.name,
+      name: module.name,
       version: moduleVersion,
       directories: { },
       _hasShrinkwrap: false,
       dist: {
-        tarball: `${this.myServerAddress}/tarballs/${module.npmName.name}`
+        tarball: `${this.myServerAddress}/tarballs/${module.name}`
       }
     };
 
@@ -206,7 +206,7 @@ export class LocalNpmServer extends Base {
     }
 
     return {
-      name: module.npmName.name,
+      name: module.name,
       modified: new Date().toString(),
       "dist-tags": {
         latest: moduleVersion
@@ -219,7 +219,7 @@ export class LocalNpmServer extends Base {
 
 
   protected async onGetTarball(packageName: string, req: express.Request, res: express.Response): Promise<void> {
-    let localModule = this.config.modules.find(module => module.npmName.name === packageName);
+    let localModule = this.config.modules.find(module => module.name === packageName);
     if (localModule) {
       try {
         let stateManager = localModule.createStateManager();
@@ -344,7 +344,7 @@ export class LocalNpmServer extends Base {
         fs.copyFileSync(backupFilename, npmrcFilename);
         fs.removeSync(backupFilename);
       }
-      console.log(`.npmrc for project ${module.npmName.name} is restored`);
+      console.log(`.npmrc for project ${module.name} is restored`);
     } catch (error) {
       if (error.code !== "ENOENT") {
         throw error;
@@ -421,23 +421,6 @@ export class LocalNpmServer extends Base {
       tokens: Object.assign(profileConfig.tokens, projectConfig.tokens),
       other: Object.assign(profileConfig.tokens, projectConfig.tokens)
     };
-  }
-
-
-  public async installLocalModule(installTo: ModuleInfo, moduleToInstall: ModuleInfo): Promise<void> {
-    await utils.cleanNpmCache();
-
-    this.enterLocalInstall(installTo);
-
-    try {
-      await utils.runCommand("npm", [ "install", moduleToInstall.npmName.name ], {
-        cwd: installTo.path
-      });
-    } finally {
-      this.exitLocalInstall(installTo);
-    }
-
-    await utils.cleanNpmCache();
   }
 
 

@@ -164,7 +164,7 @@ export class Norman {
   protected async handleListModulesCommand(): Promise<void> {
     console.log(chalk.green("-- BEGIN MODULES LIST"));
     for (let module of this.config.modules) {
-      console.log(`${module.npmName.name}: ${module.path}`);
+      console.log(`${module.name}: ${module.path}`);
     }
     console.log(chalk.green("-- END MODULES LIST"));
 
@@ -182,9 +182,9 @@ export class Norman {
 
     const printTree = (leaf: ModuleInfo, level: number = 0) => {
       let prefix = level === 0 ? (isFirst ? "- " : "\n- ") : " ".repeat(level * 2 + 2);
-      console.log(`${prefix}${leaf.npmName.name}`);
+      console.log(`${prefix}${leaf.name}`);
 
-      let root = tree.find(treeLeaf => treeLeaf.module.npmName.name === leaf.npmName.name);
+      let root = tree.find(treeLeaf => treeLeaf.module.name === leaf.name);
       if (root) {
         for (let dep of root.dependencies) {
           printTree(dep, level + 1);
@@ -202,7 +202,7 @@ export class Norman {
     console.log(chalk.green("\n-- BEGIN WALK ORDER"));
 
     await this.config.walkDependencyTree(this.config.modules, async module => {
-      console.log(module.npmName.name);
+      console.log(module.name);
     });
 
     console.log(chalk.green("-- END WALK ORDER"));
@@ -260,7 +260,7 @@ export class Norman {
 
       let argPath = args.path;
       let localModule = this.config.modules.find(module => {
-        return module.npmName.name === argPath;
+        return module.name === argPath;
       });
 
       if (!localModule) {
@@ -296,7 +296,9 @@ export class Norman {
         await synchronizer.sync(args.buildDeps);
       }
     } finally {
-      await this._server.stop();
+      if (!args.watch) {
+        await this._server.stop();
+      }
     }
   }
 
