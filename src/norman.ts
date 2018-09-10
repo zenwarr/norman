@@ -19,8 +19,7 @@ export type Arguments = {
   path: string;
   watch: string;
 } | {
-  subCommand: "start";
-  watch: boolean;
+  subCommand: "fetch";
 } | {
   subCommand: "list-modules";
 } | {
@@ -95,12 +94,7 @@ export class Norman {
     });
     syncParser.addArgument("path", { help: "Path to module to synchronize" });
 
-    let initParser = subparsers.addParser("start", { help: "Fetches and initializes all local modules" });
-    initParser.addArgument([ "--watch", "-w" ], {
-      help: "Watch for changes in local modules and automatically synchronize dependent modules",
-      action: "storeTrue",
-      defaultValue: false
-    });
+    subparsers.addParser("fetch", { help: "Fetches and initializes all local modules" });
 
     subparsers.addParser("list-modules", { help: "List all modules loaded from the configuration files" });
     subparsers.addParser("dependency-tree", { help: "Show local modules dependency tree" });
@@ -212,10 +206,10 @@ export class Norman {
   }
 
 
-  protected async handleStartCommand(): Promise<void> {
+  protected async handleFetchCommand(): Promise<void> {
     let args = this.args;
 
-    if (args.subCommand !== "start") {
+    if (args.subCommand !== "fetch") {
       return;
     }
 
@@ -226,11 +220,6 @@ export class Norman {
       this._fetcher = new ModuleFetcher(this);
       await this.moduleFetcher.fetchModules();
       await this.moduleFetcher.installModules();
-
-      // if (args.watch) {
-      //   this._appSynchronizer = new AppSynchronizer(this);
-      //   await this._appSynchronizer.start();
-      // }
     } finally {
       await this._server.stop();
     }
@@ -319,8 +308,8 @@ export class Norman {
         await this.handleCleanCommand();
         break;
 
-      case "start":
-        await this.handleStartCommand();
+      case "fetch":
+        await this.handleFetchCommand();
         break;
 
       case "sync":
