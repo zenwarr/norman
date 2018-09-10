@@ -133,8 +133,7 @@ export class ModuleStateManager extends ModuleBase {
     loadedStateFile[stateTag] = stateForTag;
 
     fs.outputJSONSync(stateFilePath, loadedStateFile, {
-      encoding: "utf-8",
-      spaces: 2
+      encoding: "utf-8"
     });
   }
 
