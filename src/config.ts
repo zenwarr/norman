@@ -183,6 +183,17 @@ export class Config {
           configPath = path.resolve(mainConfigDir, configPath);
         }
 
+        let configPathStat: fs.Stats;
+        try {
+          configPathStat = fs.statSync(configPath);
+        } catch (error) {
+          throw new Error(`Failed to include config at ${configPath}: ${error.message}`);
+        }
+
+        if (configPathStat.isDirectory()) {
+          configPath = path.join(configPath, CONFIG_FILE_NAME);
+        }
+
         try {
           let config = Config.loadConfigFromFile(configPath, false, norman);
 
