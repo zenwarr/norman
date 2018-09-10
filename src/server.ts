@@ -378,7 +378,7 @@ export class LocalNpmServer extends Base {
       env: npmEnv
     });
 
-    await utils.runCommand("npm", [ "prune "], {
+    await utils.runCommand("npm", [ "prune" ], {
       cwd: installTo.path,
       env: npmEnv
     });
