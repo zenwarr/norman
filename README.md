@@ -10,7 +10,7 @@ A tool that helps to develop multi-package Node.js apps.
    When the linked package requires another package, it first looks for it in its own `node_modules`, not in `node_modules` of the application it was linked to.
    In most cases it does work, but some packages (especially ones that use singleton instances) are not happy to be imported that way.
 3. You develop with packages layout that differs from the layout you application gets when installed in production.
-4. Circular linked dependencies is still pain for many tools.
+4. Circular linked dependencies is still a pain for many tools.
 
 # How to start?
 
