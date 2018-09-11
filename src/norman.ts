@@ -141,24 +141,18 @@ export class Norman {
       console.log(chalk.green("Cleaning local npm server cache"));
 
       LocalNpmServer.cleanCache();
-
-      console.log(chalk.green("DONE"));
     }
 
     if (args.cleanWhat === "state" || args.cleanWhat === "all") {
       console.log(chalk.green("Cleaning stored modules state"));
 
       ModuleStateManager.cleanState();
-
-      console.log(chalk.green("DONE"));
     }
 
     if (args.cleanWhat === "all") {
       console.log(chalk.green("Cleaning temp files"));
 
       ModulePackager.cleanTemp();
-
-      console.log(chalk.green("DONE"));
     }
 
     process.exit(0);

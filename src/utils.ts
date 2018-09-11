@@ -39,56 +39,6 @@ export async function runCommand(command: string, args: string[], options?: Spaw
 }
 
 
-export function updateSymlink(to: string, from: string): void {
-  let cleaner: ((path: string) => void) | null = null;
-
-  try {
-    let linkStat = fs.lstatSync(from);
-
-    try {
-      let realpath = fs.realpathSync(from);
-
-      if (linkStat.isDirectory()) {
-        // it is not a link but a directory
-        cleaner = fs.removeSync;
-      } else if (realpath !== to) {
-        // link points to another directory (or it is not a link at all), remove it and update
-        cleaner = fs.unlinkSync;
-      }
-    } catch (error) {
-      if (error.code === "ENOENT") {
-        // oops, broken link!
-        cleaner = fs.unlinkSync;
-      } else {
-        throw error;
-      }
-    }
-  } catch (error) {
-    if (error.code !== "ENOENT") {
-      throw error;
-    }
-  }
-
-  if (cleaner) {
-    cleaner(from);
-  }
-
-  fs.ensureSymlinkSync(to, from);
-}
-
-
-export function randomString(): string {
-  const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-
-  let text = "";
-  for (let i = 0; i < 20; i++) {
-    text += possible.charAt(Math.floor(Math.random() * possible.length));
-  }
-
-  return text;
-}
-
-
 export async function cleanNpmCache(): Promise<void> {
   return runCommand("npm", [ "cache", "clean", "--force" ], {
     silent: true

@@ -56,8 +56,6 @@ export class ModuleSynchronizer extends ModuleBase {
     if (runInstall) {
       await this.norman.localNpmServer.installModuleDeps(this.module);
     }
-
-    console.log(chalk.green(`SYNC DONE: ${this.module.name}`));
   }
 
 
