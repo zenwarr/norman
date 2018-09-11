@@ -19,6 +19,9 @@ export type Arguments = {
   path: string;
   watch: string;
 } | {
+  subCommand: "sync-all";
+  buildDeps: boolean;
+} | {
   subCommand: "fetch";
 } | {
   subCommand: "list-modules";
@@ -93,6 +96,14 @@ export class Norman {
       dest: "watch"
     });
     syncParser.addArgument("path", { help: "Path to module to synchronize" });
+
+    let syncAllParser = subparsers.addParser("sync-all", { help: "Synchronize all local modules" });
+    syncAllParser.addArgument("--build-deps", {
+      help: "Build dependent local modules before synchronization",
+      action: "storeTrue",
+      defaultValue: false,
+      dest: "buildDeps"
+    });
 
     subparsers.addParser("fetch", { help: "Fetches and initializes all local modules" });
 
@@ -289,6 +300,33 @@ export class Norman {
   }
 
 
+  protected async handleSyncAllCommand(): Promise<void> {
+    let args = this.args;
+
+    if (args.subCommand !== "sync-all") {
+      return;
+    }
+
+    let buildDeps = args.buildDeps;
+
+    this._server = new LocalNpmServer(this);
+    await this._server.start();
+
+    try {
+      this._fetcher = new ModuleFetcher(this);
+      await this._fetcher.fetchModules();
+      await this._fetcher.installModules();
+
+      await this.config.walkDependencyTree(this.config.modules, async localModule => {
+        let synchronizer = new ModuleSynchronizer(this, localModule);
+        await synchronizer.sync(buildDeps);
+      });
+    } finally {
+      await this._server.stop();
+    }
+  }
+
+
   protected async handleCommands(): Promise<void> {
     let args = this._args;
 
@@ -311,6 +349,10 @@ export class Norman {
 
       case "sync":
         await this.handleSyncCommand();
+        break;
+
+      case "sync-all":
+        await this.handleSyncAllCommand();
         break;
 
       default:

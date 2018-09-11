@@ -35,6 +35,8 @@ Note that norman does not rebuild local modules in watch mode, it only synchroni
 
 But you can rebuild dependent modules on regular sync with `--build-deps` flag.
 
+To sync all local modules at once, use `norman sync-all`.
+
 # `.norman.json` file
 
 All options are documented here.
