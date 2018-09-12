@@ -19,6 +19,7 @@ interface RawModuleConfig {
   path: any;
   repository: any;
   buildCommands: any;
+  npmInstall: any;
 }
 
 export interface ModuleNpmName {
@@ -35,6 +36,7 @@ export interface ModuleInfoInit {
   path: string;
   ignoreOrg: boolean;
   npmIgnorePath: string | null;
+  npmInstall: boolean;
   appConfig: Config;
 }
 
@@ -54,6 +56,7 @@ export class ModuleInfo extends Base {
   private _path: string;
   private _npmIgnorePath: string | null;
   private _appConfig: Config;
+  private _npmInstall: boolean;
 
 
   public get name(): string { return this._npmName.name; }
@@ -72,6 +75,7 @@ export class ModuleInfo extends Base {
     this._npmIgnorePath = init.npmIgnorePath;
     this._npmName = init.npmName;
     this._appConfig = init.appConfig;
+    this._npmInstall = init.npmInstall;
   }
 
 
@@ -135,6 +139,14 @@ export class ModuleInfo extends Base {
       });
     }
 
+    let npmInstall = appConfig.defaultNpmInstall;
+    if ("npmInstall" in rawConfig) {
+      if (typeof rawConfig.npmInstall !== "boolean") {
+        throw new Error("'npmInstall' should be a boolean");
+      }
+      npmInstall = rawConfig.npmInstall;
+    }
+
     return new ModuleInfo({
       repository,
       npmName,
@@ -143,7 +155,8 @@ export class ModuleInfo extends Base {
       path: modulePath,
       ignoreOrg,
       npmIgnorePath,
-      appConfig
+      appConfig,
+      npmInstall
     }, norman);
   }
 
@@ -180,7 +193,8 @@ export class ModuleInfo extends Base {
       ignoreOrg: appConfig.defaultIgnoreOrg,
       npmIgnorePath: this.resolveIgnoreFromHint(appConfig.defaultNpmIgnoreHint, dir, appConfig),
       npmName,
-      appConfig
+      appConfig,
+      npmInstall: true
     }, norman);
   }
 
@@ -224,7 +238,7 @@ export class ModuleInfo extends Base {
 
 
   public async install(): Promise<void> {
-    if (fs.existsSync(path.join(this.path, "node_modules"))) {
+    if (fs.existsSync(path.join(this.path, "node_modules")) || !this._npmInstall) {
       return;
     }
 

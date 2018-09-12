@@ -17,6 +17,7 @@ interface RawConfig {
   defaultIgnoreOrg?: any;
   includeModules?: any;
   defaultBranch?: any;
+  defaultNpmInstall?: any;
 }
 
 
@@ -26,6 +27,7 @@ interface ConfigInit {
   defaultIgnoreOrg: boolean;
   defaultNpmIgnorePath: string | boolean;
   defaultBranch: string;
+  defaultNpmInstall: boolean;
 }
 
 
@@ -36,6 +38,7 @@ export class Config {
   private _defaultNpmIgnoreHint: string | boolean;
   private _modules: ModuleInfo[] = [];
   private _defaultBranch: string;
+  private _defaultNpmInstall: boolean;
 
 
   public get mainConfigDir(): string { return this._mainConfigDir; }
@@ -48,6 +51,8 @@ export class Config {
 
   public get defaultNpmIgnoreHint(): string | boolean { return this._defaultNpmIgnoreHint; }
 
+  public get defaultNpmInstall(): boolean { return this._defaultNpmInstall; }
+
   public get modules(): ModuleInfo[] { return this._modules; }
 
 
@@ -57,6 +62,7 @@ export class Config {
     this._defaultIgnoreOrg = init.defaultIgnoreOrg;
     this._defaultNpmIgnoreHint = init.defaultNpmIgnorePath;
     this._defaultBranch = init.defaultBranch;
+    this._defaultNpmInstall = init.defaultNpmInstall;
   }
 
 
@@ -161,7 +167,15 @@ export class Config {
       defaultBranch = rawConfig.defaultBranch;
     }
 
-    let appConfig = new Config({ mainConfigDir, mainModulesDir, defaultIgnoreOrg, defaultNpmIgnorePath, defaultBranch });
+    let defaultNpmInstall = true;
+    if ("defaultNpmInstall" in rawConfig) {
+      if (typeof rawConfig.defaultNpmInstall !== "boolean") {
+        throw new Error("'defaultNpmInstall' should be a string");
+      }
+      defaultNpmInstall = rawConfig.defaultNpmInstall;
+    }
+
+    let appConfig = new Config({ mainConfigDir, mainModulesDir, defaultIgnoreOrg, defaultNpmIgnorePath, defaultBranch, defaultNpmInstall });
 
     appConfig._modules = this.loadModules(configFilename, rawConfig, appConfig, isMainConfig, norman);
 

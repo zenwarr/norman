@@ -58,6 +58,9 @@ If `false`, no attempt to use `.npmignore` is done.
 If it is a string, a custom file with ignore rules at the given path is going to be used for all modules.
 Default is `true`.
 
+`defaultNpmInstall` (boolean): should we make `npm install` in all modules by default.
+Default is `true`.
+
 `modules`: list of modules to be cloned from git repositories.
 Each item should be an object, properties of this objects are documented below under `module.*` keys.
 
@@ -73,6 +76,9 @@ If directory where this repository should be cloned already exists, the reposito
 `module.defaultBranch` (string): overrides default git defaultBranch value from `defaultBranch`.
 
 `module.npmIgnore` (string): overrides `defaultNpmIgnore` value for the module.
+
+`module.npmInstall` (boolean): should we make `npm install` in the module.
+Note that build commands are going to be run only if `npm install` is `true`.
 
 If the directory where this config is located is itself a npm package (e. g. `package.json` exists), an implicit module is created for this package with name loaded from `package.json` and without a remote repository set.
 An implicit module is created only for the directory with main config file (configs loaded with `includeModules` do not create implicit modules).
