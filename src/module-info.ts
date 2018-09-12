@@ -65,6 +65,8 @@ export class ModuleInfo extends Base {
 
   public get path(): string { return this._path; }
 
+  public get needsNpmInstall(): boolean { return this._npmInstall; }
+
 
   private constructor(init: ModuleInfoInit, norman: Norman) {
     super(norman);

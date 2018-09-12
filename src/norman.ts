@@ -279,6 +279,12 @@ export class Norman {
         }
       }
 
+      if (!localModule.needsNpmInstall) {
+        console.log(chalk.red(`Cannot sync module: 'npmInstall' for module ${localModule.name} is false`));
+        process.exit(-1);
+        return;
+      }
+
       if (args.watch) {
         let feeder = new ModulesFeeder(this, [localModule]);
         await feeder.start();
@@ -312,8 +318,12 @@ export class Norman {
       await this._fetcher.installModules();
 
       await this.config.walkDependencyTree(this.config.modules, async localModule => {
-        let synchronizer = new ModuleSynchronizer(this, localModule);
-        await synchronizer.sync(buildDeps);
+        if (localModule.needsNpmInstall) {
+          let synchronizer = new ModuleSynchronizer(this, localModule);
+          await synchronizer.sync(buildDeps);
+        } else {
+          console.log(chalk.yellow(`Skipping sync for module ${localModule.name}, because npmInstall for this module is false`));
+        }
       });
     } finally {
       await this._server.stop();
