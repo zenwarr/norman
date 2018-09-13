@@ -88,6 +88,12 @@ export class ModuleInfo extends Base {
     let repository = rawConfig.repository;
 
     let npmName = npmNameFromPackageName(gitUrlParse(repository).full_name);
+    if ("name" in rawConfig) {
+      if (typeof rawConfig.name !== "string") {
+        throw new Error("'name' should be a string");
+      }
+      npmName = npmNameFromPackageName(rawConfig.name);
+    }
 
     let branch = appConfig.defaultBranch;
     if ("branch" in rawConfig) {

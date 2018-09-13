@@ -71,6 +71,8 @@ If directory where this repository should be cloned already exists, the reposito
 
 `module.path` (string): overrides path to cloned repository for the module (deducted by default from `modulesDirectory`).
 
+`module.name` (string): overrides package name (by default deducted from repository url).
+
 `module.ignoreOrg` (boolean): overrides value of `defaultIgnoreOrg` for the module.
 
 `module.defaultBranch` (string): overrides default git defaultBranch value from `defaultBranch`.
