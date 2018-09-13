@@ -240,7 +240,7 @@ export class ModuleInfo extends Base {
 
 
   public async install(): Promise<void> {
-    if (fs.existsSync(path.join(this.path, "node_modules"))) {
+    if (fs.existsSync(path.join(this.path, "node_modules")) || !this.needsNpmInstall) {
       return;
     }
 
