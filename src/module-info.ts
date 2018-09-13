@@ -240,7 +240,7 @@ export class ModuleInfo extends Base {
 
 
   public async install(): Promise<void> {
-    if (fs.existsSync(path.join(this.path, "node_modules")) || !this._npmInstall) {
+    if (fs.existsSync(path.join(this.path, "node_modules"))) {
       return;
     }
 
@@ -263,10 +263,31 @@ export class ModuleInfo extends Base {
 
   protected async buildModule(): Promise<void> {
     for (let buildCommand of this._buildCommands) {
-      await utils.runCommand("npm", [ "run", buildCommand ], {
-        cwd: this._path
-      });
+      if (this.hasScript(buildCommand)) {
+        await utils.runCommand("npm", [ "run", buildCommand ], {
+          cwd: this.path
+        });
+      } else {
+        await utils.runCommand(buildCommand, null, {
+          cwd: this.path
+        });
+      }
     }
+  }
+
+
+  protected hasScript(scriptName: string): boolean {
+    let packageJSON: any;
+    try {
+      packageJSON = fs.readJsonSync(path.join(this.path, "package.json"));
+    } catch (error) {
+      if (error.code !== "ENOENT") {
+        throw error;
+      }
+      return false;
+    }
+
+    return Object.keys(packageJSON.scripts || {}).indexOf(scriptName) >= 0;
   }
 
 

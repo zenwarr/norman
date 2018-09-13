@@ -5,21 +5,37 @@ import * as path from "path";
 
 
 export type SpawnOptions = child_process.SpawnOptions & { silent?: boolean };
+export type ExecOptions = child_process.ExecOptions & { silent?: boolean };
 
 
-export async function runCommand(command: string, args: string[], options?: SpawnOptions): Promise<void> {
+export async function runCommand(command: string, args: null, options?: ExecOptions): Promise<void>;
+export async function runCommand(command: string, args: string[], options?: SpawnOptions): Promise<void>;
+export async function runCommand(command: string, args: string[] | null, options?: SpawnOptions | ExecOptions): Promise<void> {
   return new Promise<void>((resolve, reject) => {
-    if (options && options.silent !== true) {
-      let inClause = `(in ${options.cwd})`;
-      console.log(chalk.cyan(`→ ${command} ${args.join(" ")} ${options && options.cwd ? inClause : ""}`));
+    let silent = options && options.silent === true;
+
+    if (!silent) {
+      let inClause = options && options.cwd ? `(in ${options.cwd})` : "";
+      if (args == null) {
+        console.log(chalk.cyan(`→ ${command} ${inClause}`));
+      } else {
+        console.log(chalk.cyan(`→ ${command} ${args.join(" ")} ${inClause}`));
+      }
     }
 
-    let proc = child_process.spawn(command, args, Object.assign({
-      stdio: options && options.silent === true ? "ignore" : "inherit"
-    }, options || { }));
+    let params = Object.assign({
+      stdio: silent ? "ignore" : "inherit"
+    }, options || { });
+
+    let proc: child_process.ChildProcess;
+    if (args == null) {
+      proc = child_process.exec(command, params as ExecOptions);
+    } else {
+      proc = child_process.spawn(command, args, params as SpawnOptions);
+    }
 
     proc.on("close", code => {
-      if (options && options.silent !== true) {
+      if (!silent) {
         console.log(chalk.cyan("→ DONE"));
       }
       if (code === 0) {
@@ -30,7 +46,7 @@ export async function runCommand(command: string, args: string[], options?: Spaw
     });
 
     proc.on("error", error => {
-      if (options && options.silent !== true) {
+      if (!silent) {
         console.log(chalk.red(`→ ERROR: ${error.message}`));
       }
       reject(error);

@@ -80,6 +80,11 @@ If directory where this repository should be cloned already exists, the reposito
 `module.npmInstall` (boolean): should we make `npm install` in the module.
 Note that build commands are going to be run only if `npm install` is `true`.
 
+`module.buildCommands` (string[]): commands to run during to build the module after cloning it from the repository.
+Each command should be either a npm script or a shell command.
+Norman first checks if a npm script with given name exists in `package.json` of the local module, and if any, runs it.
+If the script is not found, it tries to run it as a shell command.
+
 If the directory where this config is located is itself a npm package (e. g. `package.json` exists), an implicit module is created for this package with name loaded from `package.json` and without a remote repository set.
 An implicit module is created only for the directory with main config file (configs loaded with `includeModules` do not create implicit modules).
 
