@@ -64,14 +64,14 @@ Default is `true`.
 `modules`: list of modules to be cloned from git repositories.
 Each item should be an object, properties of this objects are documented below under `module.*` keys.
 
+`module.name` (string): package name (the name the package has in npm registry).
+If not specified, the name is deducted from git url in `module.repository`.
+If git url is not specified too, error is raised.
+
 `module.repository` (string): url to repository to clone module source from.
-This field is required.
-Package name is deducted from this value.
 If directory where this repository should be cloned already exists, the repository is not going to be cloned.
 
 `module.path` (string): overrides path to cloned repository for the module (deducted by default from `modulesDirectory`).
-
-`module.name` (string): overrides package name (by default deducted from repository url).
 
 `module.ignoreOrg` (boolean): overrides value of `defaultIgnoreOrg` for the module.
 

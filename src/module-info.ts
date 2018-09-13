@@ -82,17 +82,24 @@ export class ModuleInfo extends Base {
 
 
   public static createFromConfig(rawConfig: RawModuleConfig, appConfig: Config, norman: Norman): ModuleInfo {
-    if (typeof rawConfig.repository !== "string") {
-      throw new Error("required 'repository' field should be a string");
+    let repository: string | null = null;
+    if ("repository" in rawConfig) {
+      if (typeof rawConfig.repository !== "string") {
+        throw new Error("'repository' should be a string");
+      }
+      repository = rawConfig.repository;
     }
-    let repository = rawConfig.repository;
 
-    let npmName = npmNameFromPackageName(gitUrlParse(repository).full_name);
+    let npmName: ModuleNpmName;
     if ("name" in rawConfig) {
       if (typeof rawConfig.name !== "string") {
         throw new Error("'name' should be a string");
       }
       npmName = npmNameFromPackageName(rawConfig.name);
+    } else if (repository != null) {
+      npmName = npmNameFromPackageName(gitUrlParse(repository).full_name);
+    } else {
+      throw new Error("module should have either 'repository' or 'name' field present");
     }
 
     let branch = appConfig.defaultBranch;

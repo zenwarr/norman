@@ -1,12 +1,13 @@
 {
   "name": "node-norman",
-  "version": "2.0.10",
+  "version": "2.0.12",
   "description": "",
   "main": "index.js",
   "scripts": {
     "build": "tsc",
     "start": "node index.js",
-    "lint": "tslint --project tsconfig.json --format verbose"
+    "lint": "tslint --project tsconfig.json --format verbose",
+    "prepublish": "npm run build"
   },
   "repository": {
     "type": "git",
