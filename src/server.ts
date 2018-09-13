@@ -303,6 +303,7 @@ export class LocalNpmServer extends Base {
       }
     }
 
+    result.npm_config_registry = this.myServerAddress;
     result["npm_config_package-lock"] = "false";
 
     return result;
