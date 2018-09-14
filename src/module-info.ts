@@ -390,18 +390,18 @@ export class ModuleInfo extends Base {
   public getLocalDependencies(includeDev: boolean): ModuleInfo[] {
     let result: ModuleInfo[] = [];
 
-    const handleModule = (module: ModuleInfo) => {
-      let deps = module.getDirectLocalDependencies(includeDev);
+    const handleModule = (module: ModuleInfo, level: number) => {
+      let deps = module.getDirectLocalDependencies(includeDev ? level === 0 : false);
 
       for (let dep of deps) {
         if (!result.find(mod => mod.name === dep.name)) {
           result.push(dep);
-          handleModule(dep);
+          handleModule(dep, level + 1);
         }
       }
     };
 
-    handleModule(this);
+    handleModule(this, 0);
 
     return result;
   }
