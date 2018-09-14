@@ -382,7 +382,7 @@ export class ModuleInfo extends Base {
 
 
   public getDirectLocalDependencies(includeDev: boolean): ModuleInfo[] {
-    let dependentPackages = utils.getPackageDeps(this.path, false);
+    let dependentPackages = utils.getPackageDeps(this.path, includeDev);
     return dependentPackages.map(pkg => this.config.getModuleInfo(pkg)).filter(dep => !!dep) as ModuleInfo[];
   }
 
