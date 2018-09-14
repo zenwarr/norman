@@ -411,6 +411,9 @@ export class ModuleInfo extends Base {
 function npmNameFromPackageName(name: string): ModuleNpmName {
   if (name.indexOf("/") > 0) {
     let [ org, pkg ] = name.split("/");
+    if (org.startsWith("@")) {
+      org = org.slice(1);
+    }
     return { org, pkg, name: `@${org}/${pkg}` };
   } else {
     return { org: "", pkg: name, name };
