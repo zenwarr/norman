@@ -64,7 +64,7 @@ export class ModulesFeeder extends Base {
 
 
   protected async onDepsChanged(module: ModuleInfo): Promise<void> {
-    console.log(chalk.green(`Dependencies of module ${module.name} has changed, reinstalling it in dependent modules...`));
+    console.log(`Dependencies of module ${module.name} has changed, reinstalling it in dependent modules...`);
     await this.stop();
     await this.start();
   }

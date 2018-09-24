@@ -2,7 +2,8 @@ import * as path from "path";
 import * as fs from "fs-extra";
 import * as utils from "./utils";
 import chalk from "chalk";
-import {ModuleBase} from "./base";
+import { ModuleBase } from "./base";
+import { ModuleInfo } from "./module-info";
 
 
 export class ModuleSynchronizer extends ModuleBase {
@@ -17,8 +18,6 @@ export class ModuleSynchronizer extends ModuleBase {
    * -       If dependencies do not match, remove the installed module and remember to run `npm install`.
    */
   public async sync(rebuildDeps: boolean): Promise<void> {
-    console.log(chalk.green(`SYNC MODULE: ${this.module.name}`));
-
     let localDependencies = this.module.getLocalDependencies(true);
 
     if (rebuildDeps) {
@@ -45,7 +44,7 @@ export class ModuleSynchronizer extends ModuleBase {
 
       let depsEqual = installedSubDeps.length === actualSubDeps.length && installedSubDeps.every((dep, q) => dep === actualSubDeps[q]);
       if (depsEqual) {
-        await (new ModuleSynchronizer(this.norman, module)).quickSync(installedPath);
+        await (new ModuleSynchronizer(this.norman, module)).quickSyncTo(this.module);
       } else {
         console.log(`Reinstalling dependencies because module ${module.name} dependencies have changed`);
         fs.removeSync(installedPath);
@@ -59,7 +58,9 @@ export class ModuleSynchronizer extends ModuleBase {
   }
 
 
-  protected async quickSync(syncTarget: string): Promise<void> {
+  protected async quickSyncTo(syncToModule: ModuleInfo): Promise<void> {
+    let syncTarget = path.join(syncToModule.path, "node_modules", this.module.name);
+
     let filesCopied = 0;
 
     await this.module.walkModuleFiles(async(filename: string, stat: fs.Stats) => {
@@ -127,7 +128,9 @@ export class ModuleSynchronizer extends ModuleBase {
     let filesRemoved = await this.quickSyncRemove(syncTarget);
 
     if (filesCopied || filesRemoved) {
-      console.log(`Copied ${filesCopied} files, removed ${filesRemoved} files`);
+      let source = chalk.green(this.module.name);
+      let target = chalk.green(syncToModule.name);
+      console.log(`${source} -> ${target}: copied ${filesCopied}, removed ${filesRemoved}`);
     }
   }
 
