@@ -90,6 +90,10 @@ If the script is not found, it tries to run it as a shell command.
 If the directory where this config is located is itself a npm package (e. g. `package.json` exists), an implicit module is created for this package with name loaded from `package.json` and without a remote repository set.
 An implicit module is created only for the directory with main config file (configs loaded with `includeModules` do not create implicit modules).
 
+## Source map support
+
+Norman automatically modifies source map files for JavaScript to always point to original source locations.
+
 # Example config
 
 ```json

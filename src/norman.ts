@@ -9,6 +9,7 @@ import {Config} from "./config";
 import {ModuleInfo} from "./module-info";
 import {ModulePackager} from "./module-packager";
 import {ModulesFeeder} from "./module-watcher";
+import { FileTransformerPlugin, SourceMapPlugin } from "./plugin";
 
 
 export type Arguments = {
@@ -38,11 +39,15 @@ export class Norman {
   private _server: LocalNpmServer | null = null;
   private _config: Config | null = null;
   private _args!: Arguments;
+  private _plugins: FileTransformerPlugin[] = [new SourceMapPlugin()];
 
 
   public get args(): Arguments {
     return this._args;
   }
+
+
+  public get plugins() { return this._plugins; }
 
 
   public get moduleFetcher(): ModuleFetcher {

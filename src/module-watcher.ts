@@ -266,7 +266,7 @@ export class ModuleWatcher extends ModuleBase {
       return [];
     }
 
-    fs.copyFileSync(sourceFilePath, targetFilePath);
+    await this.module.copyFile(sourceFilePath, targetFilePath);
     return [targetFilePath];
   }
 

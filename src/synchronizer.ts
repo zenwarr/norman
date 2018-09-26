@@ -92,7 +92,7 @@ export class ModuleSynchronizer extends ModuleBase {
 
           utils.getRidOfIt(target);
 
-          fs.copySync(filename, target);
+          await this.module.copyFile(filename, target);
 
           ++filesCopied;
         }

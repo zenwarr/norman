@@ -37,7 +37,7 @@ export class ModulePackager extends ModuleBase {
       }
 
       if (!stat.isDirectory()) {
-        fs.copyFileSync(source, target);
+        await this.module.copyFile(source, target);
       } else {
         fs.mkdirpSync(target);
       }
