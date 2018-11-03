@@ -390,14 +390,31 @@ export class Norman {
 
 
   protected buildOutdatedReport(outdatedData: any): string {
-    let lines: string[] = [];
+    let depGroups: any = { };
 
     for (let mod of Object.keys(outdatedData)) {
       for (let dep of Object.keys(outdatedData[mod])) {
         let depData = outdatedData[mod][dep];
+
+        if (dep in depGroups) {
+          depGroups[dep][mod] = depData;
+        } else {
+          depGroups[dep] = { [mod]: depData };
+        }
+      }
+    }
+
+    let lines: string[] = [];
+
+    for (let dep of Object.keys(depGroups)) {
+      lines.push(chalk.blue(dep) + ":");
+
+      for (let mod of Object.keys(depGroups[dep])) {
+        let depData = depGroups[dep][mod];
+
         let wanted = depData.wanted !== depData.current ? chalk.yellow(depData.wanted) : depData.wanted;
         let latest = depData.latest !== depData.wanted ? chalk.red(depData.latest) : depData.latest;
-        lines.push(`${mod}: ${chalk.green(dep)} installed ${depData.current}, wanted ${wanted}, latest ${latest}`);
+        lines.push(`  ${mod}: installed ${depData.current}, wanted ${wanted}, latest ${latest}`);
       }
     }
 
