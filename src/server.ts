@@ -6,14 +6,15 @@ import * as http from "http";
 import * as path from "path";
 import * as url from "url";
 import * as ini from "ini";
-import {Norman} from "./norman";
+import { Norman } from "./norman";
 import * as utils from "./utils";
 import chalk from "chalk";
 import * as contentType from "content-type";
 import * as crypto from "crypto";
-import {ModuleInfo} from "./module-info";
-import {Base} from "./base";
-import {PACK_TAG} from "./module-state-manager";
+import { ModuleInfo } from "./module-info";
+import { Base } from "./base";
+import { PACK_TAG } from "./module-state-manager";
+
 
 const accept = require("accept");
 
@@ -385,6 +386,40 @@ export class LocalNpmServer extends Base {
     });
 
     await utils.cleanNpmCache();
+  }
+
+
+  public async getOutdated(mod: ModuleInfo): Promise<any> {
+    let result = await utils.runCommand("npm", [ "outdated", "--json" ], {
+      cwd: mod.path,
+      env: this.buildNpmEnv(mod),
+      ignoreExitCode: true,
+      collectOutput: true,
+      silent: true
+    });
+
+    result = result ? result.trim() : result;
+    if (result) {
+      let resultObj = JSON.parse(result);
+
+      for (let dep of Object.keys(resultObj)) {
+        let depData = resultObj[dep];
+        if (depData.current === "linked") {
+          delete resultObj[dep];
+        }
+      }
+
+      return resultObj;
+    }
+    return { };
+  }
+
+
+  public async upgradeDependency(mod: ModuleInfo, pkg: string, version: string): Promise<void> {
+    await utils.runCommand("npm", [ "install", `${pkg}@${version}` ], {
+      cwd: mod.path,
+      env: this.buildNpmEnv(mod)
+    });
   }
 
 

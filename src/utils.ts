@@ -4,14 +4,20 @@ import * as fs from "fs-extra";
 import * as path from "path";
 
 
-export type SpawnOptions = child_process.SpawnOptions & { silent?: boolean };
-export type ExecOptions = child_process.ExecOptions & { silent?: boolean };
+type ExtraRunOptions = {
+  silent?: boolean;
+  collectOutput?: boolean;
+  ignoreExitCode?: boolean;
+};
+
+export type SpawnOptions = child_process.SpawnOptions & ExtraRunOptions;
+export type ExecOptions = child_process.ExecOptions & ExtraRunOptions;
 
 
-export async function runCommand(command: string, args: null, options?: ExecOptions): Promise<void>;
-export async function runCommand(command: string, args: string[], options?: SpawnOptions): Promise<void>;
-export async function runCommand(command: string, args: string[] | null, options?: SpawnOptions | ExecOptions): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
+export async function runCommand(command: string, args: null, options?: ExecOptions): Promise<string>;
+export async function runCommand(command: string, args: string[], options?: SpawnOptions): Promise<string>;
+export async function runCommand(command: string, args: string[] | null, options?: SpawnOptions | ExecOptions): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
     let silent = options && options.silent === true;
 
     if (!silent) {
@@ -23,9 +29,11 @@ export async function runCommand(command: string, args: string[] | null, options
       }
     }
 
-    let params = Object.assign({
+    let defOptions = options && options.collectOutput === true ? { } : {
       stdio: silent ? "ignore" : "inherit"
-    }, options || { });
+    };
+
+    let params = Object.assign(defOptions, options || { });
 
     let proc: child_process.ChildProcess;
     if (args == null) {
@@ -34,12 +42,21 @@ export async function runCommand(command: string, args: string[] | null, options
       proc = child_process.spawn(command, args, params as SpawnOptions);
     }
 
+    let output = "";
+    if (options && options.collectOutput) {
+      proc.stdout.on("data", data => {
+        output += data;
+      });
+    }
+
     proc.on("close", code => {
       if (!silent) {
         console.log(chalk.cyan("→ DONE"));
       }
       if (code === 0) {
-        resolve();
+        resolve(output);
+      } else if (options && options.ignoreExitCode) {
+        resolve(output);
       } else {
         reject(new Error(`Process exited with code ${code}`));
       }
@@ -56,7 +73,7 @@ export async function runCommand(command: string, args: string[] | null, options
 
 
 export async function cleanNpmCache(): Promise<void> {
-  return runCommand("npm", [ "cache", "clean", "--force" ], {
+  await runCommand("npm", [ "cache", "clean", "--force" ], {
     silent: true
   });
 }

@@ -31,6 +31,10 @@ export type Arguments = {
 } | {
   subCommand: "clean";
   cleanWhat: string;
+} | {
+  subCommand: "outdated";
+  upgrade: boolean;
+  hard: boolean;
 });
 
 
@@ -123,6 +127,20 @@ export class Norman {
     cleanSubparsers.addParser("cache", { help: "Clean local NPM server cache" });
     cleanSubparsers.addParser("state", { help: "Clean saved local modules state" });
     cleanSubparsers.addParser("all", { help: "Clean local NPM server cache, saved local modules cache and temp files" });
+
+    let outdatedParser = subparsers.addParser("outdated", { help: "Shows and helps to update outdated dependencies" });
+    outdatedParser.addArgument("--upgrade", {
+      help: "Automatically update all dependencies to wanted versions",
+      action: "storeTrue",
+      defaultValue: false,
+      dest: "upgrade"
+    });
+    outdatedParser.addArgument("--hard", {
+      help: "Automatically update all dependencies to the latest versions (can break things)",
+      action: "storeTrue",
+      defaultValue: false,
+      dest: "hard"
+    });
 
     let args: Arguments = argparser.parseArgs();
     this._args = args;
@@ -336,6 +354,86 @@ export class Norman {
   }
 
 
+  protected async handleOutdatedCommand(): Promise<void> {
+    let args = this.args;
+
+    if (args.subCommand !== "outdated") {
+      return;
+    }
+
+    this._server = new LocalNpmServer(this);
+    await this._server.start();
+
+    try {
+      let results: any = { };
+      let index = 1;
+      for (let mod of this.config.modules) {
+        console.log(`[${index}/${this.config.modules.length}] Analyzing dependencies of "${mod.name}"...`);
+        ++index;
+
+        let result = await this._server.getOutdated(mod);
+        if (Object.keys(result).length) {
+          results[mod.name] = result;
+        }
+      }
+
+      if (!args.upgrade) {
+        console.log(chalk.green("\n-- REPORT"));
+        console.log(this.buildOutdatedReport(results));
+      } else {
+        await this.upgradeModules(results, args.hard);
+      }
+    } finally {
+      await this._server.stop();
+    }
+  }
+
+
+  protected buildOutdatedReport(outdatedData: any): string {
+    let lines: string[] = [];
+
+    for (let mod of Object.keys(outdatedData)) {
+      for (let dep of Object.keys(outdatedData[mod])) {
+        let depData = outdatedData[mod][dep];
+        let wanted = depData.wanted !== depData.current ? chalk.yellow(depData.wanted) : depData.wanted;
+        let latest = depData.latest !== depData.wanted ? chalk.red(depData.latest) : depData.latest;
+        lines.push(`${mod}: ${chalk.green(dep)} installed ${depData.current}, wanted ${wanted}, latest ${latest}`);
+      }
+    }
+
+    if (!lines.length) {
+      lines.push(chalk.green("All modules are up to date"));
+    }
+
+    return lines.join("\n");
+  }
+
+
+  protected async upgradeModules(outdatedData: any, hard: boolean): Promise<void> {
+    for (let mod of this.config.modules) {
+      let modData = outdatedData[mod.name];
+      if (!modData) {
+        continue;
+      }
+
+      for (let dep of Object.keys(modData)) {
+        let depData = modData[dep];
+        let installVersion = hard ? depData.latest : depData.wanted;
+        if (installVersion === depData.current) {
+          continue;
+        }
+
+        console.log(`Upgrading dependencies of "${mod.name}": "${dep}@${depData.current}" -> "${dep}@${installVersion}"`);
+        try {
+          await this._server!.upgradeDependency(mod, dep, installVersion);
+        } catch (error) {
+          console.error(chalk.red(`Failed to upgrade dependency of "${mod.name}": "${dep}" to version ${installVersion}`));
+        }
+      }
+    }
+  }
+
+
   protected async handleCommands(): Promise<void> {
     let args = this._args;
 
@@ -362,6 +460,10 @@ export class Norman {
 
       case "sync-all":
         await this.handleSyncAllCommand();
+        break;
+
+      case "outdated":
+        await this.handleOutdatedCommand();
         break;
 
       default:
