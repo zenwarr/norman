@@ -97,7 +97,7 @@ Norman automatically modifies source map files for JavaScript to always point to
 ## Keeping dependencies up to date
 
 Norman can help you keep dependencies in your modules updated.
-To inspect which dependencies needs to be updated, run `norman outdated`.
+To inspect which dependencies need to be updated, run `norman outdated`.
 To automatically upgrade all packages to wanted versions (newer versions that still match semver), run `norman outdated --upgrade`.
 To upgrade all dependencies to latest versions (note that it overwrites semver ranges specified in `package.json` and can easily break things), run `norman outdated --upgrade --hard`.
 
