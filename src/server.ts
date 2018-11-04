@@ -362,6 +362,10 @@ export class LocalNpmServer extends Base {
     let projectConfig = loadNpmrc(path.join(dir, projectConfigFileName));
     let profileConfig = loadNpmrc(path.join(os.homedir(), ".npmrc"));
 
+    if (!projectConfig.registries.default && !profileConfig.registries.default) {
+      throw new Error("No default NPM registry server found in npm config files. Make sure you have .npmrc files with explicit registry settings accessible");
+    }
+
     return {
       registries: Object.assign(profileConfig.registries, projectConfig.registries),
       tokens: Object.assign(profileConfig.tokens, projectConfig.tokens),
