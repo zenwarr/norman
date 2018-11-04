@@ -60,6 +60,10 @@ export class ModuleSynchronizer extends ModuleBase {
 
   protected async quickSyncTo(syncToModule: ModuleInfo): Promise<void> {
     let syncTarget = path.join(syncToModule.path, "node_modules", this.module.name);
+    if (utils.isSymlink(syncTarget)) {
+      console.log(chalk.yellow(`Skipping sync into "${syncTarget}" because it is a linked dependency`));
+      return;
+    }
 
     let filesCopied = 0;
 

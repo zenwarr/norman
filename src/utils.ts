@@ -133,3 +133,8 @@ export function getRidOfIt(filename: string): void {
 
   (stat.isDirectory() ? fs.rmdirSync : fs.unlinkSync)(filename);
 }
+
+
+export function isSymlink(filename: string): boolean {
+  return fs.lstatSync(filename).isSymbolicLink();
+}
