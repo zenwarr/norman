@@ -239,7 +239,7 @@ export class Config {
           throw new Error("'modules' should be an array of objects");
         }
 
-        modules.push(ModuleInfo.createFromConfig(rawModule, appConfig, norman));
+        modules.push(ModuleInfo.createFromConfig(rawModule, appConfig, isMainConfig, norman));
       }
     }
 
@@ -278,14 +278,12 @@ export class Config {
 
 
   public static loadConfigFromFile(filename: string, isMainConfig: boolean, norman: Norman): Config {
-    console.log(`Loading config file from ${filename}`);
-
     let rawConfig = fs.readFileSync(filename, {
       encoding: "utf-8"
     });
 
     try {
-      return this.loadConfig(filename, JSON.parse(rawConfig), true, norman);
+      return this.loadConfig(filename, JSON.parse(rawConfig), isMainConfig, norman);
     } catch (error) {
       // invalid config, stop here
       throw new Error(`Invalid config file ${filename}: ${error.message}`);

@@ -38,6 +38,7 @@ export interface ModuleInfoInit {
   npmIgnorePath: string | null;
   npmInstall: boolean;
   appConfig: Config;
+  isMain: boolean;
 }
 
 export const IGNORE_REGEXPS = [
@@ -57,6 +58,7 @@ export class ModuleInfo extends Base {
   private _npmIgnorePath: string | null;
   private _appConfig: Config;
   private _npmInstall: boolean;
+  private _isMain: boolean;
 
 
   public get name(): string { return this._npmName.name; }
@@ -66,6 +68,8 @@ export class ModuleInfo extends Base {
   public get path(): string { return this._path; }
 
   public get needsNpmInstall(): boolean { return this._npmInstall; }
+
+  public get isMain(): boolean { return this._isMain; }
 
 
   private constructor(init: ModuleInfoInit, norman: Norman) {
@@ -78,10 +82,11 @@ export class ModuleInfo extends Base {
     this._npmName = init.npmName;
     this._appConfig = init.appConfig;
     this._npmInstall = init.npmInstall;
+    this._isMain = init.isMain;
   }
 
 
-  public static createFromConfig(rawConfig: RawModuleConfig, appConfig: Config, norman: Norman): ModuleInfo {
+  public static createFromConfig(rawConfig: RawModuleConfig, appConfig: Config, isMain: boolean, norman: Norman): ModuleInfo {
     let repository: string | null = null;
     if ("repository" in rawConfig) {
       if (typeof rawConfig.repository !== "string") {
@@ -171,7 +176,8 @@ export class ModuleInfo extends Base {
       ignoreOrg,
       npmIgnorePath,
       appConfig,
-      npmInstall
+      npmInstall,
+      isMain
     }, norman);
   }
 
@@ -209,7 +215,8 @@ export class ModuleInfo extends Base {
       npmIgnorePath: this.resolveIgnoreFromHint(appConfig.defaultNpmIgnoreHint, dir, appConfig),
       npmName,
       appConfig,
-      npmInstall: true
+      npmInstall: true,
+      isMain: true
     }, norman);
   }
 

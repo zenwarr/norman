@@ -35,6 +35,7 @@ export type Arguments = {
   subCommand: "outdated";
   upgrade: boolean;
   hard: boolean;
+  withIncluded: boolean;
 });
 
 
@@ -140,6 +141,12 @@ export class Norman {
       action: "storeTrue",
       defaultValue: false,
       dest: "hard"
+    });
+    outdatedParser.addArgument("--with-included", {
+      help: "Analyze and upgrade dependencies of modules included by 'includeModules' too",
+      action: "storeTrue",
+      defaultValue: false,
+      dest: "withIncluded"
     });
 
     let args: Arguments = argparser.parseArgs();
@@ -367,8 +374,10 @@ export class Norman {
     try {
       let results: any = { };
       let index = 1;
-      for (let mod of this.config.modules) {
-        console.log(`[${index}/${this.config.modules.length}] Analyzing dependencies of "${mod.name}"...`);
+
+      let modsToAnalyze = args.withIncluded ? this.config.modules : this.config.modules.filter(mod => mod.isMain);
+      for (let mod of modsToAnalyze) {
+        console.log(`[${index}/${modsToAnalyze.length}] Analyzing dependencies of "${mod.name}"...`);
         ++index;
 
         let result = await this._server.getOutdated(mod);

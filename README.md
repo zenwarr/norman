@@ -101,6 +101,9 @@ To inspect which dependencies need to be updated, run `norman outdated`.
 To automatically upgrade all packages to wanted versions (newer versions that still match semver), run `norman outdated --upgrade`.
 To upgrade all dependencies to latest versions (note that it overwrites semver ranges specified in `package.json` and can easily break things), run `norman outdated --upgrade --hard`.
 
+By default `outdated` command only analyzes and upgrades modules that were defined in the main config file, and modules loaded by `includeModules` are ignored.
+To include all modules, use `--with-included` argument.
+
 # Example config
 
 ```json

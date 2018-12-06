@@ -3,7 +3,6 @@ import * as path from "path";
 import * as os from "os";
 import * as crypto from "crypto";
 import {ModuleBase} from "./base";
-import {LookupAddress} from "dns";
 
 
 export type ModuleStateFiles = { [path: string]: number };
