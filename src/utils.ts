@@ -73,7 +73,7 @@ export async function runCommand(command: string, args: string[] | null, options
 
 
 export async function cleanNpmCache(): Promise<void> {
-  await runCommand("npm", [ "cache", "clean", "--force" ], {
+  await runCommand(getNpmExecutable(), [ "cache", "clean", "--force" ], {
     silent: true
   });
 }
@@ -137,4 +137,9 @@ export function getRidOfIt(filename: string): void {
 
 export function isSymlink(filename: string): boolean {
   return fs.lstatSync(filename).isSymbolicLink();
+}
+
+
+export function getNpmExecutable(): string {
+  return process.platform === "win32" ? "npm.cmd" : "npm";
 }

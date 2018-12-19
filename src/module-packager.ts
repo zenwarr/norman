@@ -2,9 +2,10 @@ import * as fs from "fs-extra";
 import * as path from "path";
 import * as utils from "./utils";
 import {ModuleBase} from "./base";
+import * as os from "os";
 
 
-const TEMP_DIR = "/tmp/norman";
+const TEMP_DIR = path.join(os.tmpdir(), "norman");
 
 
 export class ModulePackager extends ModuleBase {
@@ -43,7 +44,7 @@ export class ModulePackager extends ModuleBase {
       }
     });
 
-    await utils.runCommand("npm", [ "pack" ], {
+    await utils.runCommand(utils.getNpmExecutable(), [ "pack" ], {
       cwd: tempDir,
       silent: true
     });

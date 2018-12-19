@@ -21,8 +21,8 @@ const accept = require("accept");
 
 const NPM_SERVER_PORT = 5001;
 
-const TEMP_DIR = "/tmp/norman";
-const TARBALL_CACHE_DIR = "/tmp/norman-cache";
+const TEMP_DIR = path.join(os.tmpdir(), "norman");
+const TARBALL_CACHE_DIR = path.join(os.tmpdir(), "norman-cache");
 
 
 export type NpmConfig = {
@@ -379,12 +379,12 @@ export class LocalNpmServer extends Base {
 
     let npmEnv = this.buildNpmEnv(installTo);
 
-    await utils.runCommand("npm", [ "install" ], {
+    await utils.runCommand(utils.getNpmExecutable(), [ "install" ], {
       cwd: installTo.path,
       env: npmEnv
     });
 
-    await utils.runCommand("npm", [ "prune" ], {
+    await utils.runCommand(utils.getNpmExecutable(), [ "prune" ], {
       cwd: installTo.path,
       env: npmEnv
     });
@@ -394,7 +394,7 @@ export class LocalNpmServer extends Base {
 
 
   public async getOutdated(mod: ModuleInfo): Promise<any> {
-    let result = await utils.runCommand("npm", [ "outdated", "--json" ], {
+    let result = await utils.runCommand(utils.getNpmExecutable(), [ "outdated", "--json" ], {
       cwd: mod.path,
       env: this.buildNpmEnv(mod),
       ignoreExitCode: true,
@@ -420,7 +420,7 @@ export class LocalNpmServer extends Base {
 
 
   public async upgradeDependency(mod: ModuleInfo, pkg: string, version: string): Promise<void> {
-    await utils.runCommand("npm", [ "install", `${pkg}@${version}` ], {
+    await utils.runCommand(utils.getNpmExecutable(), [ "install", `${pkg}@${version}` ], {
       cwd: mod.path,
       env: this.buildNpmEnv(mod)
     });

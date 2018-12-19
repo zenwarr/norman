@@ -284,7 +284,7 @@ export class ModuleInfo extends Base {
   protected async buildModule(): Promise<void> {
     for (let buildCommand of this._buildCommands) {
       if (this.hasScript(buildCommand)) {
-        await utils.runCommand("npm", [ "run", buildCommand ], {
+        await utils.runCommand(utils.getNpmExecutable(), [ "run", buildCommand ], {
           cwd: this.path
         });
       } else {
