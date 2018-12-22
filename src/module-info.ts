@@ -414,16 +414,20 @@ export class ModuleInfo extends Base {
   }
 
 
-  public async copyFile(source: string, target: string): Promise<void> {
+  public async copyFile(source: string, target: string, isExecutable: boolean = false): Promise<void> {
     for (let plugin of this.norman.plugins) {
       if (plugin.matches(this, source)) {
         let fileContent = await plugin.process(this, source, fs.readFileSync(source, { encoding: "utf-8" }));
-        fs.writeFileSync(target, fileContent, { encoding: "utf-8" });
+        // tslint:disable-next-line no-bitwise
+        fs.writeFileSync(target, fileContent, { encoding: "utf-8", mode: (isExecutable ? 0o0100 : 0) | 0o666 });
         return;
       }
     }
 
     fs.copyFileSync(source, target);
+    if (isExecutable) {
+      fs.chmodSync(target, 0o766);
+    }
   }
 }
 

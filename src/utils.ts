@@ -135,6 +135,20 @@ export function getRidOfIt(filename: string): void {
 }
 
 
+export function hasExecPermission(filename: string): boolean {
+  if (process.platform === "win32") {
+    return false;
+  } else {
+    try {
+      fs.accessSync(filename, fs.constants.X_OK);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+}
+
+
 export function isSymlink(filename: string): boolean {
   return fs.lstatSync(filename).isSymbolicLink();
 }

@@ -94,9 +94,11 @@ export class ModuleSynchronizer extends ModuleBase {
             fs.mkdirpSync(parentDestDir);
           }
 
+          let targetExecutable = utils.hasExecPermission(target);
+
           utils.getRidOfIt(target);
 
-          await this.module.copyFile(filename, target);
+          await this.module.copyFile(filename, target, targetExecutable);
 
           ++filesCopied;
         }
