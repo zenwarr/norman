@@ -72,6 +72,7 @@ If git url is not specified too, error is raised.
 If directory where this repository should be cloned already exists, the repository is not going to be cloned.
 
 `module.path` (string): overrides path to cloned repository for the module (deducted by default from `modulesDirectory`).
+If the path is relative, it is considered to be relative to the parent directory of the current config.
 
 `module.ignoreOrg` (boolean): overrides value of `defaultIgnoreOrg` for the module.
 

@@ -86,7 +86,7 @@ export class ModuleInfo extends Base {
   }
 
 
-  public static createFromConfig(rawConfig: RawModuleConfig, appConfig: Config, isMain: boolean, norman: Norman): ModuleInfo {
+  public static createFromConfig(rawConfig: RawModuleConfig, appConfig: Config, isMain: boolean, configDir: string, norman: Norman): ModuleInfo {
     let repository: string | null = null;
     if ("repository" in rawConfig) {
       if (typeof rawConfig.repository !== "string") {
@@ -130,7 +130,7 @@ export class ModuleInfo extends Base {
       }
       modulePath = rawConfig.path;
       if (!path.isAbsolute(modulePath)) {
-        throw new Error(`Path for module ${npmName.name} should be absolute`);
+        modulePath = path.resolve(configDir, modulePath);
       }
     } else {
       modulePath = path.join(appConfig.mainModulesDir, ignoreOrg ? npmName.pkg : npmName.name);

@@ -184,7 +184,7 @@ export class Config {
 
 
   private static loadModules(configFilename: string, rawConfig: RawConfig, appConfig: Config, isMainConfig: boolean, norman: Norman): ModuleInfo[] {
-    let mainConfigDir = path.dirname(configFilename);
+    let configDir = path.dirname(configFilename);
 
     let modules: ModuleInfo[] = [];
     if ("includeModules" in rawConfig) {
@@ -197,7 +197,7 @@ export class Config {
         }
 
         if (!path.isAbsolute(configPath)) {
-          configPath = path.resolve(mainConfigDir, configPath);
+          configPath = path.resolve(configDir, configPath);
         }
 
         let configPathStat: fs.Stats;
@@ -239,12 +239,12 @@ export class Config {
           throw new Error("'modules' should be an array of objects");
         }
 
-        modules.push(ModuleInfo.createFromConfig(rawModule, appConfig, isMainConfig, norman));
+        modules.push(ModuleInfo.createFromConfig(rawModule, appConfig, isMainConfig, configDir, norman));
       }
     }
 
-    if (isMainConfig && !this.hasImplicitModule(modules, mainConfigDir)) {
-      let implicitModule = ModuleInfo.createImplicit(mainConfigDir, appConfig, norman);
+    if (isMainConfig && !this.hasImplicitModule(modules, configDir)) {
+      let implicitModule = ModuleInfo.createImplicit(configDir, appConfig, norman);
       if (implicitModule) {
         modules.push(implicitModule);
       }
