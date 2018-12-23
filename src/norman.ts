@@ -352,7 +352,7 @@ export class Norman {
           let synchronizer = new ModuleSynchronizer(this, localModule);
           await synchronizer.sync(buildDeps);
         } else {
-          console.log(chalk.yellow(`Skipping sync for module ${localModule.name}, because npmInstall for this module is false`));
+          console.log(chalk.yellow(`Skipping sync for module ${localModule.name} because npmInstall for this module is false`));
         }
       });
     } finally {

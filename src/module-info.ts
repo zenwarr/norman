@@ -20,6 +20,7 @@ interface RawModuleConfig {
   repository: any;
   buildCommands: any;
   npmInstall: any;
+  buildTriggers: any;
 }
 
 export interface ModuleNpmName {
@@ -39,6 +40,7 @@ export interface ModuleInfoInit {
   npmInstall: boolean;
   appConfig: Config;
   isMain: boolean;
+  buildTriggers: string[];
 }
 
 export const IGNORE_REGEXPS = [
@@ -59,6 +61,7 @@ export class ModuleInfo extends Base {
   private _appConfig: Config;
   private _npmInstall: boolean;
   private _isMain: boolean;
+  private _buildTriggers: string[];
 
 
   public get name(): string { return this._npmName.name; }
@@ -70,6 +73,8 @@ export class ModuleInfo extends Base {
   public get needsNpmInstall(): boolean { return this._npmInstall; }
 
   public get isMain(): boolean { return this._isMain; }
+
+  public get buildTriggers(): string[] { return this._buildTriggers; }
 
 
   private constructor(init: ModuleInfoInit, norman: Norman) {
@@ -83,6 +88,7 @@ export class ModuleInfo extends Base {
     this._appConfig = init.appConfig;
     this._npmInstall = init.npmInstall;
     this._isMain = init.isMain;
+    this._buildTriggers = init.buildTriggers;
   }
 
 
@@ -167,6 +173,14 @@ export class ModuleInfo extends Base {
       npmInstall = rawConfig.npmInstall;
     }
 
+    let buildTriggers: string[] = appConfig.defaultBuildTriggers;
+    if ("buildTriggers" in rawConfig) {
+      if (!Array.isArray(rawConfig.buildTriggers)) {
+        throw new Error("'buildDeps' should be an array of strings");
+      }
+      buildTriggers = rawConfig.buildTriggers;
+    }
+
     return new ModuleInfo({
       repository,
       npmName,
@@ -177,7 +191,8 @@ export class ModuleInfo extends Base {
       npmIgnorePath,
       appConfig,
       npmInstall,
-      isMain
+      isMain,
+      buildTriggers
     }, norman);
   }
 
@@ -216,7 +231,8 @@ export class ModuleInfo extends Base {
       npmName,
       appConfig,
       npmInstall: true,
-      isMain: true
+      isMain: true,
+      buildTriggers: appConfig.defaultBuildTriggers
     }, norman);
   }
 
@@ -272,7 +288,7 @@ export class ModuleInfo extends Base {
 
   public async buildModuleIfChanged(): Promise<boolean> {
     let stateManager = this.createStateManager();
-    if (await stateManager.isModuleChanged(BUILD_TAG)) {
+    if (await stateManager.needsRebuild(BUILD_TAG)) {
       await this.buildModule();
       await stateManager.saveActualState(BUILD_TAG);
       return true;
@@ -308,11 +324,6 @@ export class ModuleInfo extends Base {
     }
 
     return Object.keys(packageJSON.scripts || {}).indexOf(scriptName) >= 0;
-  }
-
-
-  public isDependsOn(module: ModuleInfo): boolean {
-    return fs.existsSync(path.join(this.path, "node_modules", module.name));
   }
 
 

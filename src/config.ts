@@ -1,6 +1,5 @@
 import {ModuleInfo} from "./module-info";
 import * as path from "path";
-import chalk from "chalk";
 import * as fs from "fs-extra";
 import {ModuleInfoWithDeps} from "./server";
 import * as utils from "./utils";
@@ -18,6 +17,7 @@ interface RawConfig {
   includeModules?: any;
   defaultBranch?: any;
   defaultNpmInstall?: any;
+  defaultBuildTriggers: any;
 }
 
 
@@ -28,6 +28,7 @@ interface ConfigInit {
   defaultNpmIgnorePath: string | boolean;
   defaultBranch: string;
   defaultNpmInstall: boolean;
+  defaultBuildTriggers: string[];
 }
 
 
@@ -39,6 +40,7 @@ export class Config {
   private _modules: ModuleInfo[] = [];
   private _defaultBranch: string;
   private _defaultNpmInstall: boolean;
+  private _defaultBuildTriggers: string[];
 
 
   public get mainConfigDir(): string { return this._mainConfigDir; }
@@ -53,6 +55,8 @@ export class Config {
 
   public get defaultNpmInstall(): boolean { return this._defaultNpmInstall; }
 
+  public get defaultBuildTriggers(): string[] { return this._defaultBuildTriggers; }
+
   public get modules(): ModuleInfo[] { return this._modules; }
 
 
@@ -63,6 +67,7 @@ export class Config {
     this._defaultNpmIgnoreHint = init.defaultNpmIgnorePath;
     this._defaultBranch = init.defaultBranch;
     this._defaultNpmInstall = init.defaultNpmInstall;
+    this._defaultBuildTriggers = init.defaultBuildTriggers;
   }
 
 
@@ -175,7 +180,15 @@ export class Config {
       defaultNpmInstall = rawConfig.defaultNpmInstall;
     }
 
-    let appConfig = new Config({ mainConfigDir, mainModulesDir, defaultIgnoreOrg, defaultNpmIgnorePath, defaultBranch, defaultNpmInstall });
+    let defaultBuildDeps: string[] = [];
+    if ("defaultBuildTriggers" in rawConfig) {
+      if (!Array.isArray(rawConfig.defaultBuildTriggers)) {
+        throw new Error("'defaultBuildTriggers' should be an array of strings");
+      }
+      defaultBuildDeps = rawConfig.defaultBuildTriggers;
+    }
+
+    let appConfig = new Config({ mainConfigDir, mainModulesDir, defaultIgnoreOrg, defaultNpmIgnorePath, defaultBranch, defaultNpmInstall, defaultBuildTriggers: defaultBuildDeps });
 
     appConfig._modules = this.loadModules(configFilename, rawConfig, appConfig, isMainConfig, norman);
 
@@ -216,7 +229,7 @@ export class Config {
 
           let extraModules = config._modules.filter(extraModule => {
             if (modules.find(module => module.name === extraModule.name)) {
-              console.log(chalk.yellow(`Ignoring module "${extraModule.name}" because it has been already loaded`));
+              // console.log(chalk.yellow(`Ignoring module "${extraModule.name}" because it has been already loaded`));
               return false;
             }
             return true;

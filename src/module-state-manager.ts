@@ -2,7 +2,9 @@ import * as fs from "fs-extra";
 import * as path from "path";
 import * as os from "os";
 import * as crypto from "crypto";
-import {ModuleBase} from "./base";
+import * as mimimatch from "minimatch";
+import { ModuleBase } from "./base";
+import { Minimatch } from "minimatch";
 
 
 export type ModuleStateFiles = { [path: string]: number };
@@ -46,7 +48,7 @@ export class ModuleStateManager extends ModuleBase {
       parts.push("" + state.files[filename]);
     }
 
-    return crypto.createHmac("sha256", "norman").update(parts.join(":")).digest("hex");
+    return crypto.createHash("sha256").update(parts.join(":")).digest("hex");
   }
 
 
@@ -143,12 +145,12 @@ export class ModuleStateManager extends ModuleBase {
 
 
   public pathToStateFile(): string {
-    let hash = crypto.createHmac("sha256", "norman").update(this.norman.config.mainConfigDir).digest("hex");
+    let hash = crypto.createHash("sha256").update(this.module.path).digest("hex");
     return path.join(STATE_DIR, `state-${hash}.json`);
   }
 
 
-  public async isModuleChanged(stateTag: string): Promise<boolean> {
+  public async needsRebuild(stateTag: string): Promise<boolean> {
     let prevState = await this.loadSavedState(stateTag);
     let currentState = await this.loadActualState();
 
@@ -156,14 +158,42 @@ export class ModuleStateManager extends ModuleBase {
       return true;
     }
 
-    if (prevState.files.length !== currentState.files.length) {
+    let prevStateBuildDeps = this.filterBuildTriggers(prevState.files);
+    let currentStateBuildDeps = this.filterBuildTriggers(currentState.files);
+
+    if (prevStateBuildDeps.length !== currentState.files.length) {
       return true;
     }
 
-    let files = Object.keys(prevState.files);
-    for (let filename of files) {
-      if (!currentState.files[filename] || currentState.files[filename] > prevState.files[filename]) {
-        console.log(`module ${this.module.name} changed, file ${filename}`);
+    for (let filename of Object.keys(prevStateBuildDeps)) {
+      if (!currentStateBuildDeps[filename] || currentStateBuildDeps[filename] > prevStateBuildDeps[filename]) {
+        console.log(`rebuilding ${this.module.name}, detected change: ${filename}`);
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+
+  private filterBuildTriggers(stateFiles: ModuleStateFiles): ModuleStateFiles {
+    let result: ModuleStateFiles = { };
+    for (let filename of Object.keys(stateFiles)) {
+      if (this.isBuildTrigger(filename)) {
+        result[filename] = stateFiles[filename];
+      }
+    }
+    return result;
+  }
+
+
+  private isBuildTrigger(filename: string): boolean {
+    if (!this.module.buildTriggers || !this.module.buildTriggers.length) {
+      return true;
+    }
+
+    for (let pattern of this.module.buildTriggers) {
+      if (mimimatch(filename, pattern, { matchBase: true})) {
         return true;
       }
     }
