@@ -287,7 +287,6 @@ export class Norman {
     try {
       this._fetcher = new ModuleFetcher(this);
       await this._fetcher.fetchModules();
-      await this._fetcher.installModules();
 
       let argPath = args.path;
       let localModule = this.config.modules.find(module => {
