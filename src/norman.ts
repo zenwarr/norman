@@ -24,6 +24,7 @@ export type Arguments = {
   buildDeps: boolean;
 } | {
   subCommand: "fetch";
+  noInstall: boolean;
 } | {
   subCommand: "list-modules";
 } | {
@@ -115,7 +116,13 @@ export class Norman {
       dest: "buildDeps"
     });
 
-    subparsers.addParser("fetch", { help: "Fetches and initializes all local modules" });
+    let fetchParser = subparsers.addParser("fetch", { help: "Fetches and initializes all local modules" });
+    fetchParser.addArgument("--no-install", {
+      help: "Do not run install steps or build modules after fetching",
+      action: "storeTrue",
+      defaultValue: false,
+      dest: "noInstall"
+    });
 
     subparsers.addParser("list-modules", { help: "List all modules loaded from the configuration files" });
     subparsers.addParser("dependency-tree", { help: "Show local modules dependency tree" });
@@ -251,7 +258,10 @@ export class Norman {
     try {
       this._fetcher = new ModuleFetcher(this);
       await this.moduleFetcher.fetchModules();
-      await this.moduleFetcher.installModules();
+
+      if (!args.noInstall) {
+        await this.moduleFetcher.installModules();
+      }
     } finally {
       await this._server.stop();
     }
