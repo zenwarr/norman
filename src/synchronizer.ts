@@ -52,6 +52,10 @@ export class ModuleSynchronizer extends ModuleBase {
       }
     });
 
+    if (!fs.existsSync(path.join(this.module.path, "node_modules"))) {
+      runInstall = true;
+    }
+
     if (runInstall) {
       await this.norman.localNpmServer.installModuleDeps(this.module);
     }
