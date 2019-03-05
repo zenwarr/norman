@@ -95,6 +95,25 @@ export function getPackageDeps(packagePath: string, includeDev: boolean = true):
 }
 
 
+export function isPackageInstalled(into: string, pkg: string): boolean {
+  let installedPath = path.join(into, "node_modules", pkg);
+  return fs.existsSync(installedPath);
+}
+
+
+export function getFirstMissingDependency(packagePath: string, includeDev: boolean = true): string | null {
+  let deps = getPackageDeps(packagePath, includeDev);
+
+  for (let dep of deps) {
+    if (!isPackageInstalled(packagePath, dep)) {
+      return dep;
+    }
+  }
+
+  return null;
+}
+
+
 export async function walkDirectoryFiles(startDir: string, walker: (filename: string, stat: fs.Stats) => Promise<void>): Promise<void> {
   const handle = async(filename: string) => {
     let stat: fs.Stats;

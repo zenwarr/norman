@@ -56,6 +56,12 @@ export class ModuleSynchronizer extends ModuleBase {
       runInstall = true;
     }
 
+    let firstMissing = utils.getFirstMissingDependency(this.module.path);
+    if (firstMissing != null) {
+      console.log(`Reinstalling dependencies because module ${firstMissing} is not installed`);
+      runInstall = true;
+    }
+
     if (runInstall) {
       await this.norman.localNpmServer.installModuleDeps(this.module);
     }

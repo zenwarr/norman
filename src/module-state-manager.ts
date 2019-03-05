@@ -4,7 +4,6 @@ import * as os from "os";
 import * as crypto from "crypto";
 import * as mimimatch from "minimatch";
 import { ModuleBase } from "./base";
-import { Minimatch } from "minimatch";
 
 
 export type ModuleStateFiles = { [path: string]: number };
