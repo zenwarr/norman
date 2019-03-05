@@ -530,6 +530,7 @@ export function start(): void {
   norman.start().catch((error: Error) => {
     console.log(chalk.red(`Error: ${error.message}`));
     console.error(error);
+    process.exit(-1);
   });
 }
 
