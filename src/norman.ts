@@ -14,6 +14,7 @@ import { FileTransformerPlugin, SourceMapPlugin } from "./plugin";
 
 export type Arguments = {
   config: string | null;
+  ignoreMissingIncludedModules: boolean;
 } & ({
   subCommand: "sync";
   buildDeps: boolean;
@@ -86,6 +87,12 @@ export class Norman {
     });
     argparser.addArgument([ "--config", "-c" ], {
       help: "Path to config file or a directory containing config file named .norman.json"
+    });
+    argparser.addArgument("--ignore-missing-included-modules", {
+      help: "Do not raise an error if a path specified in 'includeModules' is invalid",
+      action: "storeTrue",
+      defaultValue: false,
+      dest: "ignoreMissingIncludedModules"
     });
 
     let subparsers = argparser.addSubparsers({
@@ -510,7 +517,7 @@ export class Norman {
   public async start(): Promise<void> {
     this.parseArgs();
 
-    this._config = Config.findAndLoadConfig(this._args.config || process.cwd(), this);
+    this._config = Config.findAndLoadConfig(this._args.config || process.cwd(), this._args.ignoreMissingIncludedModules, this);
 
     return this.handleCommands();
   }

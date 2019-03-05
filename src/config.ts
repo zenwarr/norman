@@ -4,6 +4,7 @@ import * as fs from "fs-extra";
 import {ModuleInfoWithDeps} from "./server";
 import * as utils from "./utils";
 import {Norman} from "./norman";
+import chalk from "chalk";
 
 
 const CONFIG_FILE_NAME = ".norman.json";
@@ -131,7 +132,7 @@ export class Config {
   }
 
 
-  public static loadConfig(configFilename: string, rawConfig: RawConfig, isMainConfig: boolean, norman: Norman): Config {
+  public static loadConfig(configFilename: string, rawConfig: RawConfig, isMainConfig: boolean, ignoreMissing: boolean, norman: Norman): Config {
     let mainConfigDir = path.dirname(configFilename);
 
     let mainModulesDir: string;
@@ -190,13 +191,13 @@ export class Config {
 
     let appConfig = new Config({ mainConfigDir, mainModulesDir, defaultIgnoreOrg, defaultNpmIgnorePath, defaultBranch, defaultNpmInstall, defaultBuildTriggers: defaultBuildDeps });
 
-    appConfig._modules = this.loadModules(configFilename, rawConfig, appConfig, isMainConfig, norman);
+    appConfig._modules = this.loadModules(configFilename, rawConfig, appConfig, isMainConfig, ignoreMissing, norman);
 
     return appConfig;
   }
 
 
-  private static loadModules(configFilename: string, rawConfig: RawConfig, appConfig: Config, isMainConfig: boolean, norman: Norman): ModuleInfo[] {
+  private static loadModules(configFilename: string, rawConfig: RawConfig, appConfig: Config, isMainConfig: boolean, ignoreMissing: boolean, norman: Norman): ModuleInfo[] {
     let configDir = path.dirname(configFilename);
 
     let modules: ModuleInfo[] = [];
@@ -217,6 +218,11 @@ export class Config {
         try {
           configPathStat = fs.statSync(configPath);
         } catch (error) {
+          if (ignoreMissing) {
+            console.log(chalk.yellow(`Ignoring "includeModules" for "${configPath}", configuration file does not exist`));
+            continue;
+          }
+
           throw new Error(`Failed to include config at ${configPath}: ${error.message}`);
         }
 
@@ -225,15 +231,9 @@ export class Config {
         }
 
         try {
-          let config = Config.loadConfigFromFile(configPath, false, norman);
+          let config = Config.loadConfigFromFile(configPath, false, ignoreMissing, norman);
 
-          let extraModules = config._modules.filter(extraModule => {
-            if (modules.find(module => module.name === extraModule.name)) {
-              // console.log(chalk.yellow(`Ignoring module "${extraModule.name}" because it has been already loaded`));
-              return false;
-            }
-            return true;
-          });
+          let extraModules = config._modules.filter(extraModule => !modules.find(module => module.name === extraModule.name));
 
           modules = modules.concat(extraModules);
         } catch (error) {
@@ -272,7 +272,7 @@ export class Config {
   }
 
 
-  public static findAndLoadConfig(startDir: string, norman: Norman): Config {
+  public static findAndLoadConfig(startDir: string, ignoreMissing: boolean, norman: Norman): Config {
     const findConfigForDir = (dir: string): string => {
       if (!dir || dir === "/" || dir === ".") {
         throw new Error(`No ${CONFIG_FILE_NAME} found in directory tree`);
@@ -286,17 +286,17 @@ export class Config {
       }
     };
 
-    return this.loadConfigFromFile(findConfigForDir(startDir), true, norman);
+    return this.loadConfigFromFile(findConfigForDir(startDir), true, ignoreMissing, norman);
   }
 
 
-  public static loadConfigFromFile(filename: string, isMainConfig: boolean, norman: Norman): Config {
+  public static loadConfigFromFile(filename: string, isMainConfig: boolean, ignoreMissing: boolean, norman: Norman): Config {
     let rawConfig = fs.readFileSync(filename, {
       encoding: "utf-8"
     });
 
     try {
-      return this.loadConfig(filename, JSON.parse(rawConfig), isMainConfig, norman);
+      return this.loadConfig(filename, JSON.parse(rawConfig), isMainConfig, ignoreMissing, norman);
     } catch (error) {
       // invalid config, stop here
       throw new Error(`Invalid config file ${filename}: ${error.message}`);
