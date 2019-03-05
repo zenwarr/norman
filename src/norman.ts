@@ -292,9 +292,6 @@ export class Norman {
     await this._server.start();
 
     try {
-      this._fetcher = new ModuleFetcher(this);
-      await this._fetcher.fetchModules();
-
       let argPath = args.path;
       let localModule = this.config.modules.find(module => {
         return module.name === argPath;
