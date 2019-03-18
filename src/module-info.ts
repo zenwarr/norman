@@ -426,19 +426,24 @@ export class ModuleInfo extends Base {
 
 
   public async copyFile(source: string, target: string, isExecutable: boolean = false): Promise<void> {
+    // here we always copy a file by loading it into memory because fs.copyFile has problems on VirtualBox shared folders
+
+    const saveFile = () => {
+      // tslint:disable-next-line no-bitwise
+      fs.writeFileSync(target, fileContent, { encoding: "utf-8", mode: (isExecutable ? 0o0100 : 0) | 0o666 });
+    };
+
+    let fileContent = fs.readFileSync(source, { encoding: "utf-8" });
+
     for (let plugin of this.norman.plugins) {
       if (plugin.matches(this, source)) {
-        let fileContent = await plugin.process(this, source, fs.readFileSync(source, { encoding: "utf-8" }));
-        // tslint:disable-next-line no-bitwise
-        fs.writeFileSync(target, fileContent, { encoding: "utf-8", mode: (isExecutable ? 0o0100 : 0) | 0o666 });
+        fileContent = await plugin.process(this, source, fileContent);
+        saveFile();
         return;
       }
     }
 
-    fs.copyFileSync(source, target);
-    if (isExecutable) {
-      fs.chmodSync(target, 0o766);
-    }
+    saveFile();
   }
 }
 
