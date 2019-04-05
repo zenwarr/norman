@@ -83,7 +83,7 @@ export function getPackageDeps(packagePath: string, includeDev: boolean = true):
   try {
     let pkgPath = path.join(packagePath, "package.json");
     let pkg = fs.readJSONSync(pkgPath, { encoding: "utf-8" });
-    let deps = Object.keys(pkg.dependencies);
+    let deps = Object.keys(pkg.dependencies || {});
     if (includeDev) {
       deps = deps.concat(Object.keys(pkg.devDependencies || {}));
     }
