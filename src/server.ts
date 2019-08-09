@@ -14,12 +14,11 @@ import * as crypto from "crypto";
 import { ModuleInfo } from "./module-info";
 import { Base } from "./base";
 import { PACK_TAG } from "./module-state-manager";
+import { AddressInfo } from "net";
 
 
 const accept = require("accept");
 
-
-const NPM_SERVER_PORT = 5001;
 
 const TEMP_DIR = path.join(os.tmpdir(), "norman");
 const TARBALL_CACHE_DIR = path.join(os.tmpdir(), "norman-cache");
@@ -41,16 +40,12 @@ export interface ModuleInfoWithDeps {
 export class LocalNpmServer extends Base {
   protected app: express.Application;
   protected npmConfig!: NpmConfig;
-  protected myServerAddress: string;
-  protected port: number;
+  protected port?: number;
   protected server: http.Server | null = null;
 
 
-  public constructor(norman: Norman, port: number = NPM_SERVER_PORT) {
+  public constructor(norman: Norman) {
     super(norman);
-
-    this.port = port;
-    this.myServerAddress = `http://localhost:${port}`;
 
     this.app = express();
 
@@ -76,12 +71,25 @@ export class LocalNpmServer extends Base {
   }
 
 
+  public get myServerAddress() {
+    if (this.port == null) {
+      throw new Error("Cannot get npm server address: server not started yet");
+    } else {
+      return `http://localhost:${this.port}`;
+    }
+  }
+
+
   public async start(): Promise<void> {
     this.npmConfig = this.loadNpmConfig(this.config.mainConfigDir, ".npmrc");
 
-    this.server = this.app.listen(NPM_SERVER_PORT);
-
-    console.log(`Local npm server listening on ${NPM_SERVER_PORT}`);
+    return new Promise<void>((resolve, reject) => {
+      this.server = this.app.listen(0, () => {
+        this.port = (this.server!.address() as AddressInfo).port;
+        console.log(`Local npm server listening on ${this.port}`);
+        resolve();
+      });
+    });
   }
 
 
