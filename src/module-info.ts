@@ -430,7 +430,7 @@ export class ModuleInfo extends Base {
 
     const saveFile = () => {
       // tslint:disable-next-line no-bitwise
-      fs.writeFileSync(target, fileContent, { encoding: "utf-8", mode: (isExecutable ? 0o0100 : 0) | 0o666 });
+      fs.writeFileSync(target, fileContent, { mode: (isExecutable ? 0o0100 : 0) | 0o666 });
     };
 
     let fileContent = fs.readFileSync(source);
