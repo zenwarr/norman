@@ -433,7 +433,7 @@ export class ModuleInfo extends Base {
       fs.writeFileSync(target, fileContent, { encoding: "utf-8", mode: (isExecutable ? 0o0100 : 0) | 0o666 });
     };
 
-    let fileContent = fs.readFileSync(source, { encoding: "utf-8" });
+    let fileContent = fs.readFileSync(source);
 
     for (let plugin of this.norman.plugins) {
       if (plugin.matches(this, source)) {
