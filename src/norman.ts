@@ -537,7 +537,7 @@ process.on("uncaughtException", (error) => {
   process.exit(-1);
 });
 
-process.on("unhandledRejection", (error) => {
+process.on("unhandledRejection", (error: any) => {
   console.log(chalk.red(`UNHANDLED REJECTION: ${error.message}: ${error.stack}`));
   process.exit(-1);
 });
