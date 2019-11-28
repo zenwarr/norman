@@ -30,7 +30,8 @@ export async function runCommand(command: string, args: string[] | null, options
     }
 
     let defOptions = options && options.collectOutput === true ? { } : {
-      stdio: silent ? "ignore" : "inherit"
+      stdio: silent ? "ignore" : "inherit",
+      stderr: silent ? "ignore" : "inherit"
     };
 
     let params = Object.assign(defOptions, options || { });
