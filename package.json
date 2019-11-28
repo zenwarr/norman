@@ -6,8 +6,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node index.js",
-    "lint": "tslint --project tsconfig.json --format verbose",
-    "prepublish": "npm run build"
+    "lint": "tslint --project tsconfig.json --format verbose"
   },
   "repository": {
     "type": "git",
