@@ -59,6 +59,8 @@ export async function runCommand(command: string, args: string[] | null, options
       } else if (options && options.ignoreExitCode) {
         resolve(output);
       } else {
+        logProcessExecuteError(code, command, args, options);
+
         reject(new Error(`Process exited with code ${code}`));
       }
     });
@@ -70,6 +72,29 @@ export async function runCommand(command: string, args: string[] | null, options
       reject(error);
     });
   });
+}
+
+
+function logProcessExecuteError(exitCode: number, command: string, args: null | string[], options?: SpawnOptions | ExecOptions) {
+  console.log(chalk.red("Failed to execute the following command:"));
+  if (args == null) {
+    console.log(chalk.redBright("  " + command));
+  } else {
+    const commandParams = args.join(" ");
+    console.log(chalk.redBright(`  ${command} ${commandParams}`));
+  }
+
+  if (options && options.cwd) {
+    console.log(chalk.redBright("  in directory:", options.cwd));
+  }
+
+  if (exitCode === 127) {
+    if (args == null) {
+      console.log(chalk.red(`Please make sure executable exists, or, in case or running npm script, make sure that script ${command} exists`));
+    } else {
+      console.log(chalk.red("Please make sure executable exists"));
+    }
+  }
 }
 
 
