@@ -106,18 +106,13 @@ export async function cleanNpmCache(): Promise<void> {
 
 
 export function getPackageDeps(packagePath: string, includeDev: boolean = true): string[] {
-  try {
-    let pkgPath = path.join(packagePath, "package.json");
-    let pkg = fs.readJSONSync(pkgPath, { encoding: "utf-8" });
-    let deps = Object.keys(pkg.dependencies || {});
-    if (includeDev) {
-      deps = deps.concat(Object.keys(pkg.devDependencies || {}));
-    }
-    return deps;
-  } catch (error) {
-    console.log(chalk.yellow(`Failed to get dependencies for package at path [${packagePath}]: ${error.message}`));
-    return [];
+  let pkgPath = path.join(packagePath, "package.json");
+  let pkg = fs.readJSONSync(pkgPath, { encoding: "utf-8" });
+  let deps = Object.keys(pkg.dependencies || {});
+  if (includeDev) {
+    deps = deps.concat(Object.keys(pkg.devDependencies || {}));
   }
+  return deps;
 }
 
 

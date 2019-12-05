@@ -8,14 +8,15 @@ import { ModuleInfo } from "./module-info";
 
 export class ModuleSynchronizer extends ModuleBase {
   /**
-   * - Enumerate local dependencies of the module
+   * - Synchronizes dependencies or the current module.
    * - For each dependency, do the following:
    * -   Build the module if `--build-deps` is true and the module has changed since the previous build.
-   * -   If the module is listed in `package.json`, but not installed, remember to run `npm install` in the end and go to the next module.
+   * -   If the module is listed in `package.json` of the current module, but not installed, remember to run `npm install` in the end and go to the next module.
    * -   If the module is installed, check if it is actual:
    * -     Compare dependencies of the installed module with dependencies of the actual module.
-   * -       If dependencies match, just copy source files to installed module and proceed to the next module.
-   * -       If dependencies do not match, remove the installed module and remember to run `npm install`.
+   * -     Dependencies are considered matched if no dependencies were removed, added or upgraded.
+   * -       If dependencies match, just copy source files to installed module (quick sync).
+   * -       If dependencies do not match, remove the installed module from `node_modules` of the current module and run `npm install`.
    */
   public async sync(rebuildDeps: boolean): Promise<void> {
     let localDependencies = this.module.getLocalDependencies(true);
@@ -28,38 +29,37 @@ export class ModuleSynchronizer extends ModuleBase {
 
     let runInstall = false;
 
-    await this.config.walkDependencyTree(localDependencies, async module => {
-      // check if module is installed into this module node_modules
-      // todo: the module can be installed into nested directory
-      let installedPath = path.join(this.module.path, "node_modules", module.name);
-      if (!fs.existsSync(installedPath)) {
-        console.log(`Reinstalling dependencies because module ${module.name} is not installed`);
-        runInstall = true;
-        return;
-      }
-
-      // get deps of the installed modules
-      let installedSubDeps = utils.getPackageDeps(installedPath, true).sort();
-      let actualSubDeps = utils.getPackageDeps(module.path, true).sort();
-
-      let depsEqual = installedSubDeps.length === actualSubDeps.length && installedSubDeps.every((dep, q) => dep === actualSubDeps[q]);
-      if (depsEqual) {
-        await (new ModuleSynchronizer(this.norman, module)).quickSyncTo(this.module);
-      } else {
-        console.log(`Reinstalling dependencies because module ${module.name} dependencies have changed`);
-        fs.removeSync(installedPath);
-        runInstall = true;
-      }
-    });
-
     if (!fs.existsSync(path.join(this.module.path, "node_modules"))) {
       runInstall = true;
-    }
+    } else {
+      await this.config.walkDependencyTree(localDependencies, async module => {
+        // check if the dependency is installed into node_modules of the current module
+        let installedDepPath = path.join(this.module.path, "node_modules", module.name);
+        if (!fs.existsSync(installedDepPath)) {
+          console.log(`Reinstalling dependencies because module ${module.name} is not installed`);
+          runInstall = true;
+          return;
+        }
 
-    let firstMissing = utils.getFirstMissingDependency(this.module.path);
-    if (firstMissing != null) {
-      console.log(`Reinstalling dependencies because module ${firstMissing} is not installed`);
-      runInstall = true;
+        // get deps of the installed local module
+        let installedSubDeps = utils.getPackageDeps(installedDepPath, true).sort();
+        let actualSubDeps = utils.getPackageDeps(module.path, true).sort();
+
+        let depsEqual = installedSubDeps.length === actualSubDeps.length && installedSubDeps.every((dep, q) => dep === actualSubDeps[q]);
+        if (depsEqual) {
+          await (new ModuleSynchronizer(this.norman, module)).quickSyncTo(this.module);
+        } else {
+          console.log(`Reinstalling dependencies because module ${module.name} dependencies have changed`);
+          fs.removeSync(installedDepPath);
+          runInstall = true;
+        }
+      });
+
+      let firstMissing = utils.getFirstMissingDependency(this.module.path);
+      if (firstMissing != null) {
+        console.log(`Reinstalling dependencies because module ${firstMissing} is not installed`);
+        runInstall = true;
+      }
     }
 
     if (runInstall) {
@@ -68,6 +68,9 @@ export class ModuleSynchronizer extends ModuleBase {
   }
 
 
+  /**
+   * Performs quick synchronization (without using npm) of files in this module inside `syncToModule` module.
+   */
   protected async quickSyncTo(syncToModule: ModuleInfo): Promise<void> {
     let syncTarget = path.join(syncToModule.path, "node_modules", this.module.name);
     if (utils.isSymlink(syncTarget)) {
@@ -75,72 +78,7 @@ export class ModuleSynchronizer extends ModuleBase {
       return;
     }
 
-    let filesCopied = 0;
-
-    await this.module.walkModuleFiles(async(filename: string, stat: fs.Stats) => {
-      if (!this.module.isFileShouldBePublished(filename)) {
-        return;
-      }
-
-      let target = path.join(syncTarget, path.relative(this.module.path, filename));
-
-      if (!stat.isDirectory()) {
-        let doCopy = false;
-
-        let targetStat: fs.Stats | null = null;
-        try {
-          targetStat = fs.statSync(target);
-          doCopy = stat.mtime.valueOf() > targetStat.mtime.valueOf();
-        } catch (error) {
-          doCopy = error.code === "ENOENT";
-          if (error.code !== "ENOENT") {
-            console.log(chalk.red(`Error while copying to ${target}: ${error.message}`));
-          }
-        }
-
-        if (doCopy) {
-          let parentDestDir = path.dirname(target);
-          if (!fs.existsSync(parentDestDir)) {
-            fs.mkdirpSync(parentDestDir);
-          }
-
-          let targetExecutable = utils.hasExecPermission(target);
-
-          utils.getRidOfIt(target);
-
-          await this.module.copyFile(filename, target, targetExecutable);
-
-          ++filesCopied;
-        }
-      } else {
-        let doCreate = false;
-
-        let targetStat: fs.Stats | null = null;
-
-        try {
-          targetStat = fs.lstatSync(target);
-        } catch (error) {
-          // assume it does not exists
-          doCreate = true;
-        }
-
-        if (targetStat) {
-          if (targetStat.isDirectory()) {
-            // skip
-          } else {
-            fs.unlinkSync(target);
-            doCreate = true;
-          }
-        }
-
-        if (doCreate) {
-          fs.mkdirpSync(target);
-
-          ++filesCopied;
-        }
-      }
-    });
-
+    let filesCopied = await this.quickSyncCopy(syncTarget);
     let filesRemoved = await this.quickSyncRemove(syncTarget);
 
     if (filesCopied || filesRemoved) {
@@ -151,7 +89,89 @@ export class ModuleSynchronizer extends ModuleBase {
   }
 
 
-  protected async quickSyncRemove(syncTarget: string): Promise<number> {
+  /**
+   * Finds files that should be copied from source directory to target
+   */
+  private async quickSyncCopy(syncTarget: string): Promise<number> {
+    let filesCopied = 0;
+
+    await this.module.walkModuleFiles(async(filename: string, stat: fs.Stats) => {
+      if (!this.module.isFileShouldBePublished(filename)) {
+        return;
+      }
+
+      let target = path.join(syncTarget, path.relative(this.module.path, filename));
+
+      let isCopied: boolean;
+      if (!stat.isDirectory()) {
+        isCopied = await this.quickSyncFile(filename, stat, target);
+      } else {
+        isCopied = await this.quickSyncDirectory(filename, target);
+      }
+
+      if (isCopied) {
+        ++filesCopied;
+      }
+    });
+
+    return filesCopied;
+  }
+
+
+  private async quickSyncFile(source: string, sourceStat: fs.Stats, target: string): Promise<boolean> {
+    try {
+      const targetStat = fs.statSync(target);
+
+      // do not copy the file if existing target file has newer or the same modification time
+      if (sourceStat.mtime.valueOf() <= targetStat.mtime.valueOf()) {
+        return false;
+      }
+    } catch (error) {
+      if (error.code !== "ENOENT") {
+        console.log(chalk.red(`Error while copying to ${target}: ${error.message}`));
+        return false;
+      }
+    }
+
+    let parentDestDir = path.dirname(target);
+    if (!fs.existsSync(parentDestDir)) {
+      fs.mkdirpSync(parentDestDir);
+    }
+
+    let isTargetExecutable = utils.hasExecPermission(target);
+
+    utils.getRidOfIt(target);
+    await this.module.copyFile(source, target, isTargetExecutable);
+
+    return true;
+  }
+
+
+  private async quickSyncDirectory(source: string, target: string): Promise<boolean> {
+    let targetStat: fs.Stats | null = null;
+
+    try {
+      targetStat = fs.lstatSync(target);
+    } catch (error) {
+      // assume it does not exists, keep silent about errors and try to create the directory
+    }
+
+    if (targetStat) {
+      if (targetStat.isDirectory()) {
+        // nothing to do, this is already a directory
+        return false;
+      } else {
+        // this is a file, but we need a directory
+        fs.unlinkSync(target);
+      }
+    }
+
+    fs.mkdirpSync(target);
+    return true;
+  }
+
+
+  private async quickSyncRemove(syncTarget: string): Promise<number> {
     let filesToRemove: [string, fs.Stats][] = [];
 
     await utils.walkDirectoryFiles(syncTarget, async(filename, stat) => {
