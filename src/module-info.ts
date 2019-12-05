@@ -46,9 +46,7 @@ export interface ModuleInfoInit {
 export const IGNORE_REGEXPS = [
   /node_modules$/,
   /.git$/,
-  /.idea$/,
-  /\/.npmrc-norman-backup$/,
-  /\/package-lock.norman-backup.json$/
+  /.idea$/
 ];
 
 export class ModuleInfo extends Base {
@@ -399,12 +397,15 @@ export class ModuleInfo extends Base {
   }
 
 
-  public getDirectLocalDependencies(includeDev: boolean): ModuleInfo[] {
+  private getDirectLocalDependencies(includeDev: boolean): ModuleInfo[] {
     let dependentPackages = utils.getPackageDeps(this.path, includeDev);
     return dependentPackages.map(pkg => this.config.getModuleInfo(pkg)).filter(dep => !!dep) as ModuleInfo[];
   }
 
 
+  /**
+   * Return list of dependencies of the current module that are managed locally by norman.
+   */
   public getLocalDependencies(includeDev: boolean): ModuleInfo[] {
     let result: ModuleInfo[] = [];
 
