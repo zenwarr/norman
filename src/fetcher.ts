@@ -4,11 +4,7 @@ import {Base} from "./base";
 export default class ModuleFetcher extends Base {
   public async fetchModules() {
     for (let module of this.config.modules) {
-      try {
-        await module.fetch();
-      } catch (error) {
-        console.error(`Failed to fetch module: ${error.message}`);
-      }
+      await module.fetch();
     }
   }
 
