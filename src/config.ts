@@ -3,8 +3,9 @@ import * as path from "path";
 import * as fs from "fs-extra";
 import { ModuleInfoWithDeps } from "./server";
 import * as utils from "./utils";
-import { Norman } from "./norman";
 import chalk from "chalk";
+import { ServiceLocator } from "./locator";
+import { getArgs } from "./arguments";
 
 
 const CONFIG_FILE_NAME = ".norman.json";
@@ -77,7 +78,7 @@ export class Config {
   }
 
 
-  public constructor(init: ConfigInit) {
+  protected constructor(init: ConfigInit) {
     this._mainConfigDir = init.mainConfigDir;
     this._mainModulesDir = init.mainModulesDir;
     this._defaultIgnoreOrg = init.defaultIgnoreOrg;
@@ -93,62 +94,7 @@ export class Config {
   }
 
 
-  public getDependencyTree(modules: ModuleInfo[]): ModuleInfoWithDeps[] {
-    return modules.map(module => {
-      let subDeps = utils.getPackageDeps(module.path).map(moduleName => this.getModuleInfo(moduleName)).filter(dep => dep != null);
-
-      return {
-        module,
-        dependencies: subDeps as ModuleInfo[]
-      };
-    });
-  }
-
-
-  public async walkDependencyTree(modules: ModuleInfo[], walker: (module: ModuleInfo) => Promise<void>): Promise<void> {
-    let tree = this.getDependencyTree(modules);
-
-    const walkedModules: string[] = [];
-
-    const markWalked = (module: ModuleInfo) => {
-      if (walkedModules.indexOf(module.name) < 0) {
-        walkedModules.push(module.name);
-      }
-    };
-
-    const isAlreadyWalked = (module: ModuleInfo) => {
-      return walkedModules.indexOf(module.name) >= 0;
-    };
-
-    const walkModule = async (module: ModuleInfoWithDeps, parents: string[]) => {
-      if (isAlreadyWalked(module.module)) {
-        return;
-      }
-
-      for (let dep of module.dependencies) {
-        if (parents.indexOf(dep.name) >= 0) {
-          // recursive dep
-          throw new Error(`Recursive dependency: ${ dep.name }, required by ${ parents.join(" -> ") }`);
-        }
-
-        let depWithDeps = tree.find(mod => mod.module.name === dep.name);
-        if (depWithDeps) {
-          await walkModule(depWithDeps, parents.concat([ module.module.name ]));
-        }
-      }
-
-      await walker(module.module);
-
-      markWalked(module.module);
-    };
-
-    for (let module of tree) {
-      await walkModule(module, []);
-    }
-  }
-
-
-  public static loadConfig(configFilename: string, rawConfig: RawConfig, isMainConfig: boolean, ignoreMissing: boolean, norman: Norman): Config {
+  public static loadConfig(configFilename: string, rawConfig: RawConfig, isMainConfig: boolean, ignoreMissing: boolean): Config {
     let mainConfigDir = path.dirname(configFilename);
 
     let mainModulesDir: string;
@@ -215,13 +161,13 @@ export class Config {
       defaultBuildTriggers: defaultBuildDeps
     });
 
-    appConfig._modules = this.loadModules(configFilename, rawConfig, appConfig, isMainConfig, ignoreMissing, norman);
+    appConfig._modules = this.loadModules(configFilename, rawConfig, appConfig, isMainConfig, ignoreMissing);
 
     return appConfig;
   }
 
 
-  private static loadModules(configFilename: string, rawConfig: RawConfig, appConfig: Config, isMainConfig: boolean, ignoreMissing: boolean, norman: Norman): ModuleInfo[] {
+  private static loadModules(configFilename: string, rawConfig: RawConfig, appConfig: Config, isMainConfig: boolean, ignoreMissing: boolean): ModuleInfo[] {
     let configDir = path.dirname(configFilename);
 
     let modules: ModuleInfo[] = [];
@@ -255,7 +201,7 @@ export class Config {
         }
 
         try {
-          let config = Config.loadConfigFromFile(configPath, false, ignoreMissing, norman);
+          let config = Config.loadConfigFromFile(configPath, false, ignoreMissing);
 
           let extraModules = config._modules.filter(extraModule => !modules.find(module => module.name === extraModule.name));
 
@@ -276,7 +222,7 @@ export class Config {
           throw new Error("'modules' should be an array of objects");
         }
 
-        modules.push(ModuleInfo.createFromConfig(rawModule, appConfig, isMainConfig, configDir, norman));
+        modules.push(ModuleInfo.createFromConfig(rawModule, appConfig, isMainConfig, configDir));
       }
     }
 
@@ -284,7 +230,7 @@ export class Config {
   }
 
 
-  public static findAndLoadConfig(startDir: string, ignoreMissing: boolean, norman: Norman): Config {
+  public static findAndLoadConfig(startDir: string, ignoreMissing: boolean): Config {
     const findConfigForDir = (dir: string): string => {
       if (!dir || dir === "/" || dir === ".") {
         throw new Error(`No ${ CONFIG_FILE_NAME } found in directory tree`);
@@ -298,20 +244,33 @@ export class Config {
       }
     };
 
-    return this.loadConfigFromFile(findConfigForDir(startDir), true, ignoreMissing, norman);
+    return this.loadConfigFromFile(findConfigForDir(startDir), true, ignoreMissing);
   }
 
 
-  public static loadConfigFromFile(filename: string, isMainConfig: boolean, ignoreMissing: boolean, norman: Norman): Config {
+  public static loadConfigFromFile(filename: string, isMainConfig: boolean, ignoreMissing: boolean): Config {
     let rawConfig = fs.readFileSync(filename, {
       encoding: "utf-8"
     });
 
     try {
-      return this.loadConfig(filename, JSON.parse(rawConfig), isMainConfig, ignoreMissing, norman);
+      return this.loadConfig(filename, JSON.parse(rawConfig), isMainConfig, ignoreMissing);
     } catch (error) {
       // invalid config, stop here
       throw new Error(`Invalid config file ${ filename }: ${ error.message }`);
     }
   }
+
+
+  public static init() {
+    const args = getArgs();
+    const config = Config.findAndLoadConfig(args.config || process.cwd(), args.ignoreMissingIncludedModules);
+    ServiceLocator.instance.initialize("config", config);
+  }
+}
+
+
+
+export function getConfig() {
+  return ServiceLocator.instance.get<Config>("config");
 }

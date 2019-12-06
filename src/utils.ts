@@ -136,7 +136,7 @@ export function getFirstMissingDependency(packagePath: string, includeDev: boole
 
 
 export async function walkDirectoryFiles(startDir: string, walker: (filename: string, stat: fs.Stats) => Promise<void>): Promise<void> {
-  const handle = async (filename: string) => {
+  const handle = async(filename: string) => {
     let stat: fs.Stats;
 
     try {

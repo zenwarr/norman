@@ -2,17 +2,16 @@ import * as chokidar from "chokidar";
 import chalk from "chalk";
 import * as path from "path";
 import * as fs from "fs-extra";
-import { Base, ModuleBase } from "./base";
+import { ModuleOperator } from "./base";
 import { IGNORE_REGEXPS, ModuleInfo } from "./module-info";
-import { Norman } from "./norman";
 import { ModuleSynchronizer } from "./module-synchronizer";
 import { EventEmitter } from "events";
 import luxon = require("luxon");
 
 
-export class ModulesFeeder extends Base {
-  public constructor(norman: Norman, private _modulesToFeed: ModuleInfo[]) {
-    super(norman);
+export class ModulesFeeder {
+  public constructor(private _modulesToFeed: ModuleInfo[]) {
+
   }
 
 
@@ -45,7 +44,7 @@ export class ModulesFeeder extends Base {
       await existingWatcher.addSyncTarget(targetModule);
       return existingWatcher;
     } else {
-      let watcher = new ModuleWatcher(this.norman, module);
+      let watcher = new ModuleWatcher(module);
       watcher.addDepsChangedHandler(this.onDepsChanged.bind(this, module));
       await watcher.addSyncTarget(targetModule);
       await watcher.watch();
@@ -74,15 +73,15 @@ export class ModulesFeeder extends Base {
 /**
  * Watches source code of a module for changes and synchronizes it to given targets.
  */
-export class ModuleWatcher extends ModuleBase {
-  public constructor(norman: Norman, module: ModuleInfo) {
-    super(norman, module);
+export class ModuleWatcher extends ModuleOperator {
+  public constructor(module: ModuleInfo) {
+    super(module);
   }
 
 
   public async addSyncTarget(target: ModuleInfo): Promise<void> {
     let targetPath = path.join(target.path, "node_modules", this.module.name);
-    let synchronizer = new ModuleSynchronizer(this.norman, target);
+    let synchronizer = new ModuleSynchronizer(target);
     await synchronizer.sync(false);
     this._syncTargets.push(targetPath);
   }
@@ -99,7 +98,7 @@ export class ModuleWatcher extends ModuleBase {
       return;
     }
 
-    let synchronizer = new ModuleSynchronizer(this.norman, this.module);
+    let synchronizer = new ModuleSynchronizer(this.module);
     await synchronizer.sync(false);
 
     let watcher = chokidar.watch(this.module.path, {

@@ -1,16 +1,19 @@
 import * as fs from "fs-extra";
 import * as path from "path";
 import * as utils from "./utils";
-import { ModuleBase } from "./base";
+import { ModuleOperator } from "./base";
 import * as os from "os";
+import { getArgs } from "./arguments";
 
 
 const TEMP_DIR = path.join(os.tmpdir(), "norman");
 
 
-export class ModulePackager extends ModuleBase {
+export class ModulePackager extends ModuleOperator {
   public async pack(stateHash: string): Promise<string> {
-    if (this.norman.args.subCommand === "sync" && this.norman.args.buildDeps) {
+    const args = getArgs();
+
+    if (args.subCommand === "sync" && args.buildDeps) {
       await this.module.buildModuleIfChanged();
     }
 
@@ -20,7 +23,7 @@ export class ModulePackager extends ModuleBase {
 
     let tempDir = path.join(TEMP_DIR, `${ this.module.name }-${ stateHash }`);
 
-    await this.module.walkModuleFiles(async (source, stat) => {
+    await this.module.walkModuleFiles(async(source, stat) => {
       let relativeSourceFileName = path.relative(this.module.path, source);
       if (relativeSourceFileName === ".gitignore" || relativeSourceFileName === ".npmignore") {
         return;

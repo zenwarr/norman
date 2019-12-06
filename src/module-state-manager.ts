@@ -3,7 +3,7 @@ import * as path from "path";
 import * as os from "os";
 import * as crypto from "crypto";
 import * as mimimatch from "minimatch";
-import { ModuleBase } from "./base";
+import { ModuleOperator } from "./base";
 
 
 export type ModuleStateFiles = { [path: string]: number };
@@ -23,11 +23,11 @@ export interface ModuleState {
 const STATE_DIR = path.join(os.homedir(), ".norman-state");
 
 
-export class ModuleStateManager extends ModuleBase {
+export class ModuleStateManager extends ModuleOperator {
   public async loadActualState(): Promise<ModuleState> {
     const resultFiles: ModuleStateFiles = {};
 
-    await this.module.walkModuleFiles(async (filename, stat) => {
+    await this.module.walkModuleFiles(async(filename, stat) => {
       resultFiles[filename] = stat.mtime.valueOf();
     });
 

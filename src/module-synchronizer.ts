@@ -2,11 +2,14 @@ import * as path from "path";
 import * as fs from "fs-extra";
 import * as utils from "./utils";
 import chalk from "chalk";
-import { ModuleBase } from "./base";
+import { ModuleOperator } from "./base";
 import { ModuleInfo } from "./module-info";
+import { getConfig } from "./config";
+import { getServer } from "./server";
+import { walkDependencyTree } from "./dependency-tree";
 
 
-export class ModuleSynchronizer extends ModuleBase {
+export class ModuleSynchronizer extends ModuleOperator {
   /**
    * - Synchronizes dependencies or the current module.
    * - For each dependency, do the following:
@@ -19,10 +22,12 @@ export class ModuleSynchronizer extends ModuleBase {
    * -       If dependencies do not match, remove the installed module from `node_modules` of the current module and run `npm install`.
    */
   public async sync(rebuildDeps: boolean): Promise<void> {
+    const server = getServer();
+
     let localDependencies = this.module.getLocalDependencies(true);
 
     if (rebuildDeps) {
-      await this.config.walkDependencyTree(localDependencies, async module => {
+      await walkDependencyTree(localDependencies, async module => {
         await module.buildModuleIfChanged();
       });
     }
@@ -32,7 +37,7 @@ export class ModuleSynchronizer extends ModuleBase {
     if (!fs.existsSync(path.join(this.module.path, "node_modules"))) {
       runInstall = true;
     } else {
-      await this.config.walkDependencyTree(localDependencies, async module => {
+      await walkDependencyTree(localDependencies, async module => {
         // check if the dependency is installed into node_modules of the current module
         let installedDepPath = path.join(this.module.path, "node_modules", module.name);
         if (!fs.existsSync(installedDepPath)) {
@@ -47,7 +52,7 @@ export class ModuleSynchronizer extends ModuleBase {
 
         let depsEqual = installedSubDeps.length === actualSubDeps.length && installedSubDeps.every((dep, q) => dep === actualSubDeps[q]);
         if (depsEqual) {
-          await (new ModuleSynchronizer(this.norman, module)).quickSyncTo(this.module);
+          await (new ModuleSynchronizer(module)).quickSyncTo(this.module);
         } else {
           console.log(`Reinstalling dependencies because module ${ module.name } dependencies have changed`);
           fs.removeSync(installedDepPath);
@@ -63,7 +68,7 @@ export class ModuleSynchronizer extends ModuleBase {
     }
 
     if (runInstall) {
-      await this.norman.localNpmServer.installModuleDeps(this.module);
+      await server.installModuleDeps(this.module);
     }
   }
 
@@ -95,7 +100,7 @@ export class ModuleSynchronizer extends ModuleBase {
   private async quickSyncCopy(syncTarget: string): Promise<number> {
     let filesCopied = 0;
 
-    await this.module.walkModuleFiles(async (filename: string, stat: fs.Stats) => {
+    await this.module.walkModuleFiles(async(filename: string, stat: fs.Stats) => {
       if (!this.module.isFileShouldBePublished(filename)) {
         return;
       }
@@ -174,7 +179,7 @@ export class ModuleSynchronizer extends ModuleBase {
   private async quickSyncRemove(syncTarget: string): Promise<number> {
     let filesToRemove: [ string, fs.Stats ][] = [];
 
-    await utils.walkDirectoryFiles(syncTarget, async (filename, stat) => {
+    await utils.walkDirectoryFiles(syncTarget, async(filename, stat) => {
       let relpath = path.relative(syncTarget, filename);
 
       let sourceFilename = path.join(this.module.path, relpath);

@@ -1,9 +1,12 @@
-import { Base } from "./base";
+import { getConfig } from "./config";
+import { walkDependencyTree } from "./dependency-tree";
 
 
-export default class ModuleFetcher extends Base {
+export default class ModuleFetcher {
   public async fetchModules() {
-    for (let module of this.config.modules) {
+    const config = getConfig();
+
+    for (let module of config.modules) {
       try {
         await module.fetch();
       } catch (error) {
@@ -14,7 +17,9 @@ export default class ModuleFetcher extends Base {
 
 
   public async installModules() {
-    await this.config.walkDependencyTree(this.config.modules, async module => {
+    const config = getConfig();
+
+    await walkDependencyTree(config.modules, async module => {
       await module.install();
     });
   }

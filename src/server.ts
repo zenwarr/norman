@@ -6,15 +6,15 @@ import * as http from "http";
 import * as path from "path";
 import * as url from "url";
 import * as ini from "ini";
-import { Norman } from "./norman";
 import * as utils from "./utils";
 import chalk from "chalk";
 import * as contentType from "content-type";
 import * as crypto from "crypto";
 import { ModuleInfo } from "./module-info";
-import { Base } from "./base";
 import { PACK_TAG } from "./module-state-manager";
 import { AddressInfo } from "net";
+import { getConfig } from "./config";
+import { ServiceLocator } from "./locator";
 
 
 const accept = require("accept");
@@ -37,16 +37,14 @@ export interface ModuleInfoWithDeps {
 }
 
 
-export class LocalNpmServer extends Base {
+export class LocalNpmServer {
   protected app: express.Application;
   protected npmConfig!: NpmConfig;
   protected port?: number;
   protected server: http.Server | null = null;
 
 
-  public constructor(norman: Norman) {
-    super(norman);
-
+  protected constructor() {
     this.app = express();
 
     this.app.get("/tarballs/:package", (req, res) => {
@@ -81,7 +79,8 @@ export class LocalNpmServer extends Base {
 
 
   public async start(): Promise<void> {
-    this.npmConfig = this.loadNpmConfig(this.config.mainConfigDir, ".npmrc");
+    const config = getConfig();
+    this.npmConfig = this.loadNpmConfig(config.mainConfigDir, ".npmrc");
 
     return new Promise<void>((resolve, reject) => {
       this.server = this.app.listen(0, () => {
@@ -105,7 +104,9 @@ export class LocalNpmServer extends Base {
 
 
   protected async onGetPackage(packageName: string, req: express.Request, res: express.Response): Promise<void> {
-    let localModule = this.config.modules.find(module => module.name === packageName);
+    const config = getConfig();
+
+    let localModule = config.modules.find(module => module.name === packageName);
     if (localModule) {
       let acceptedTypes: string[] = accept.mediaTypes(req.headers.accept);
       if (acceptedTypes.length && acceptedTypes[0] === "application/vnd.npm.install-v1+json") {
@@ -226,7 +227,9 @@ export class LocalNpmServer extends Base {
 
 
   protected async onGetTarball(packageName: string, req: express.Request, res: express.Response): Promise<void> {
-    let localModule = this.config.modules.find(module => module.name === packageName);
+    const config = getConfig();
+
+    let localModule = config.modules.find(module => module.name === packageName);
     if (localModule) {
       try {
         let stateManager = localModule.createStateManager();
@@ -438,4 +441,17 @@ export class LocalNpmServer extends Base {
   public static cleanCache(): void {
     fs.removeSync(TARBALL_CACHE_DIR);
   }
+
+
+  public static async init() {
+    const server = new LocalNpmServer();
+    await server.start();
+    ServiceLocator.instance.initialize("server", server);
+  }
+}
+
+
+
+export function getServer() {
+  return ServiceLocator.instance.get<LocalNpmServer>("server");
 }

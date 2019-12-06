@@ -1,13 +1,13 @@
-import { Config } from "./config";
+import { Config, getConfig } from "./config";
 import * as path from "path";
 import * as fs from "fs-extra";
 import gitUrlParse = require("git-url-parse");
 import * as utils from "./utils";
 import { BUILD_TAG, ModuleStateManager } from "./module-state-manager";
-import { Norman } from "./norman";
 import ignore from "ignore";
 import { ModulePackager } from "./module-packager";
-import { Base } from "./base";
+import { getServer } from "./server";
+import { getPluginManager } from "./plugins";
 
 
 interface RawModuleConfig {
@@ -49,7 +49,7 @@ export const IGNORE_REGEXPS = [
   /.idea$/
 ];
 
-export class ModuleInfo extends Base {
+export class ModuleInfo {
   private _repository: string | null;
   private _npmName: ModuleNpmName;
   private _buildCommands: string[];
@@ -87,8 +87,7 @@ export class ModuleInfo extends Base {
   }
 
 
-  private constructor(init: ModuleInfoInit, norman: Norman) {
-    super(norman);
+  private constructor(init: ModuleInfoInit) {
     this._path = init.path;
     this._repository = init.repository;
     this._buildCommands = init.buildCommands;
@@ -102,7 +101,7 @@ export class ModuleInfo extends Base {
   }
 
 
-  public static createFromConfig(rawConfig: RawModuleConfig, appConfig: Config, isMain: boolean, configDir: string, norman: Norman): ModuleInfo {
+  public static createFromConfig(rawConfig: RawModuleConfig, appConfig: Config, isMain: boolean, configDir: string): ModuleInfo {
     let repository: string | null = null;
     if ("repository" in rawConfig) {
       if (typeof rawConfig.repository !== "string") {
@@ -203,7 +202,7 @@ export class ModuleInfo extends Base {
       npmInstall,
       isMain,
       buildTriggers
-    }, norman);
+    });
   }
 
 
@@ -238,12 +237,12 @@ export class ModuleInfo extends Base {
 
 
   public createStateManager(): ModuleStateManager {
-    return new ModuleStateManager(this.norman, this);
+    return new ModuleStateManager(this);
   }
 
 
   public createPackager(): ModulePackager {
-    return new ModulePackager(this.norman, this);
+    return new ModulePackager(this);
   }
 
 
@@ -252,7 +251,7 @@ export class ModuleInfo extends Base {
       return;
     }
 
-    await this.norman.localNpmServer.installModuleDeps(this);
+    await getServer().installModuleDeps(this);
 
     await this.buildModuleIfChanged();
   }
@@ -343,7 +342,7 @@ export class ModuleInfo extends Base {
 
 
   public async walkModuleFiles(walker: (filename: string, state: fs.Stats) => Promise<void>): Promise<void> {
-    const handle = async (source: string) => {
+    const handle = async(source: string) => {
       if (!this.isModuleFile(source)) {
         return;
       }
@@ -372,8 +371,10 @@ export class ModuleInfo extends Base {
 
 
   private getDirectLocalDependencies(includeDev: boolean): ModuleInfo[] {
+    const config = getConfig();
+
     let dependentPackages = utils.getPackageDeps(this.path, includeDev);
-    return dependentPackages.map(pkg => this.config.getModuleInfo(pkg)).filter(dep => !!dep) as ModuleInfo[];
+    return dependentPackages.map(pkg => config.getModuleInfo(pkg)).filter(dep => !!dep) as ModuleInfo[];
   }
 
 
@@ -410,7 +411,7 @@ export class ModuleInfo extends Base {
 
     let fileContent = fs.readFileSync(source);
 
-    for (let plugin of this.norman.plugins) {
+    for (let plugin of getPluginManager().plugins) {
       if (plugin.matches(this, source)) {
         fileContent = await plugin.process(this, source, fileContent);
         saveFile();
