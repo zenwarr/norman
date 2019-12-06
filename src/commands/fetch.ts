@@ -1,5 +1,5 @@
 import { getServer, LocalNpmServer } from "../server";
-import ModuleFetcher from "../fetcher";
+import { fetchModules, installModules } from "../fetcher";
 import { getArgs } from "../arguments";
 
 
@@ -13,11 +13,10 @@ export async function fetchCommand() {
   await LocalNpmServer.init();
 
   try {
-    let fetcher = new ModuleFetcher();
-    await fetcher.fetchModules();
+    await fetchModules();
 
     if (!args.noInstall) {
-      await fetcher.installModules();
+      await installModules();
     }
   } finally {
     await getServer().stop();

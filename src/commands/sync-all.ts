@@ -1,10 +1,10 @@
 import { getServer, LocalNpmServer } from "../server";
-import ModuleFetcher from "../fetcher";
 import { ModuleSynchronizer } from "../module-synchronizer";
 import * as chalk from "chalk";
 import { getArgs } from "../arguments";
 import { getConfig } from "../config";
 import { walkDependencyTree } from "../dependency-tree";
+import { fetchModules, installModules } from "../fetcher";
 
 
 export async function syncAllCommand() {
@@ -20,9 +20,8 @@ export async function syncAllCommand() {
   await LocalNpmServer.init();
 
   try {
-    let fetcher = new ModuleFetcher();
-    await fetcher.fetchModules();
-    await fetcher.installModules();
+    await fetchModules();
+    await installModules();
 
     await walkDependencyTree(config.modules, async localModule => {
       if (localModule.needsNpmInstall) {
