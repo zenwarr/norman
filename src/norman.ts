@@ -1,4 +1,4 @@
-import chalk from "chalk";
+import * as chalk from "chalk";
 import { Config } from "./config";
 import { listModulesCommand } from "./commands/list-modules";
 import { dependencyTreeCommand } from "./commands/dependency-tree";

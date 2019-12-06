@@ -1,4 +1,4 @@
-import chalk from "chalk";
+import * as chalk from "chalk";
 import { getServer, LocalNpmServer } from "../server";
 import * as path from "path";
 import { ModulesFeeder } from "../module-watcher";

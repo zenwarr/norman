@@ -1,5 +1,5 @@
 import * as chokidar from "chokidar";
-import chalk from "chalk";
+import * as chalk from "chalk";
 import * as path from "path";
 import * as fs from "fs-extra";
 import { ModuleOperator } from "./base";
@@ -29,7 +29,7 @@ export class ModulesFeeder {
     for (let key of Object.keys(this._pool)) {
       let watcher = this._pool[key]!;
       watcher.clearSyncTargets();
-      watcher.stop();
+      await watcher.stop();
       delete this._pool[key];
     }
   }
@@ -119,9 +119,9 @@ export class ModuleWatcher extends ModuleOperator {
   }
 
 
-  public stop(): void {
+  public async stop(): Promise<void> {
     if (this._watcher) {
-      this._watcher.close();
+      await this._watcher.close();
       this._watcher = null;
     }
   }

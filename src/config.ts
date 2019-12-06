@@ -1,9 +1,7 @@
 import { ModuleInfo } from "./module-info";
 import * as path from "path";
 import * as fs from "fs-extra";
-import { ModuleInfoWithDeps } from "./server";
-import * as utils from "./utils";
-import chalk from "chalk";
+import * as chalk from "chalk";
 import { ServiceLocator } from "./locator";
 import { getArgs } from "./arguments";
 

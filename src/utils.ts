@@ -1,5 +1,5 @@
 import * as child_process from "child_process";
-import chalk from "chalk";
+import * as chalk from "chalk";
 import * as fs from "fs-extra";
 import * as path from "path";
 
@@ -44,7 +44,7 @@ export async function runCommand(command: string, args: string[] | null, options
     }
 
     let output = "";
-    if (options && options.collectOutput) {
+    if (options && options.collectOutput && proc.stdout) {
       proc.stdout.on("data", data => {
         output += data;
       });

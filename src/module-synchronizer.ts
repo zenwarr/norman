@@ -1,10 +1,9 @@
 import * as path from "path";
 import * as fs from "fs-extra";
 import * as utils from "./utils";
-import chalk from "chalk";
+import * as chalk from "chalk";
 import { ModuleOperator } from "./base";
 import { ModuleInfo } from "./module-info";
-import { getConfig } from "./config";
 import { getServer } from "./server";
 import { walkDependencyTree } from "./dependency-tree";
 

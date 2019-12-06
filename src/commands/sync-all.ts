@@ -1,7 +1,7 @@
 import { getServer, LocalNpmServer } from "../server";
 import ModuleFetcher from "../fetcher";
 import { ModuleSynchronizer } from "../module-synchronizer";
-import chalk from "chalk";
+import * as chalk from "chalk";
 import { getArgs } from "../arguments";
 import { getConfig } from "../config";
 import { walkDependencyTree } from "../dependency-tree";

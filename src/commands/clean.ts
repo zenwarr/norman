@@ -1,4 +1,4 @@
-import chalk from "chalk";
+import * as chalk from "chalk";
 import { LocalNpmServer } from "../server";
 import { ModuleStateManager } from "../module-state-manager";
 import { ModulePackager } from "../module-packager";

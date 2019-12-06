@@ -1,4 +1,4 @@
-import chalk from "chalk";
+import * as chalk from "chalk";
 import { ModuleInfo } from "../module-info";
 import { getConfig } from "../config";
 import { getDependencyTree, walkDependencyTree } from "../dependency-tree";

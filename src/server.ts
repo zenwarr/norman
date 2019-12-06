@@ -7,7 +7,7 @@ import * as path from "path";
 import * as url from "url";
 import * as ini from "ini";
 import * as utils from "./utils";
-import chalk from "chalk";
+import * as chalk from "chalk";
 import * as contentType from "content-type";
 import * as crypto from "crypto";
 import { ModuleInfo } from "./module-info";

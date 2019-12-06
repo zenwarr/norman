@@ -1,5 +1,5 @@
 import { getServer, LocalNpmServer } from "../server";
-import chalk from "chalk";
+import * as chalk from "chalk";
 import { getArgs } from "../arguments";
 import { getConfig } from "../config";
 
