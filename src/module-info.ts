@@ -195,46 +195,6 @@ export class ModuleInfo extends Base {
   }
 
 
-  public static createImplicit(dir: string, appConfig: Config, norman: Norman): ModuleInfo | null {
-    let packageJsonPath = path.join(dir, "package.json");
-    if (!fs.existsSync(packageJsonPath)) {
-      return null;
-    }
-
-    let pkg = fs.readJSONSync(packageJsonPath);
-
-    let pkgName = pkg.name;
-    let npmName: ModuleNpmName;
-    if (pkgName.indexOf("/") >= 0) {
-      npmName = {
-        org: pkgName.slice(0, pkgName.indexOf("/")),
-        pkg: pkgName.slice(pkgName.indexOf("/") + 1),
-        name: pkgName
-      };
-    } else {
-      npmName = {
-        org: "",
-        pkg: pkgName,
-        name: pkgName
-      };
-    }
-
-    return new ModuleInfo({
-      repository: null,
-      buildCommands: [],
-      branch: appConfig.defaultBranch,
-      path: appConfig.mainConfigDir,
-      ignoreOrg: appConfig.defaultIgnoreOrg,
-      npmIgnorePath: this.resolveIgnoreFromHint(appConfig.defaultNpmIgnoreHint, dir, appConfig),
-      npmName,
-      appConfig,
-      npmInstall: true,
-      isMain: true,
-      buildTriggers: appConfig.defaultBuildTriggers
-    }, norman);
-  }
-
-
   public static resolveIgnoreFromHint(hint: string | boolean, modulePath: string, appConfig: Config): string | null {
     let npmIgnorePath: string | null = null;
     if (typeof hint === "string") {

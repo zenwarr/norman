@@ -256,19 +256,7 @@ export class Config {
       }
     }
 
-    if (isMainConfig && !this.hasImplicitModule(modules, configDir)) {
-      let implicitModule = ModuleInfo.createImplicit(configDir, appConfig, norman);
-      if (implicitModule) {
-        modules.push(implicitModule);
-      }
-    }
-
     return modules;
-  }
-
-
-  private static hasImplicitModule(modules: ModuleInfo[], mainConfigDir: string): boolean {
-    return modules.find(module => module.name === mainConfigDir) != null;
   }
 
 

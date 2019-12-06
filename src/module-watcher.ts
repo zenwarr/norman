@@ -5,7 +5,7 @@ import * as fs from "fs-extra";
 import {Base, ModuleBase} from "./base";
 import {IGNORE_REGEXPS, ModuleInfo} from "./module-info";
 import {Norman} from "./norman";
-import {ModuleSynchronizer} from "./synchronizer";
+import {ModuleSynchronizer} from "./module-synchronizer";
 import {EventEmitter} from "events";
 import luxon = require("luxon");
 

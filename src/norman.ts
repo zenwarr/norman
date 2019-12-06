@@ -1,4 +1,4 @@
-import {ModuleSynchronizer} from "./synchronizer";
+import {ModuleSynchronizer} from "./module-synchronizer";
 import ModuleFetcher from "./fetcher";
 import chalk from "chalk";
 import * as path from "path";
