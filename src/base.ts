@@ -1,5 +1,5 @@
-import {Norman} from "./norman";
-import {ModuleInfo} from "./module-info";
+import { Norman } from "./norman";
+import { ModuleInfo } from "./module-info";
 
 
 export class Base {
@@ -8,9 +8,13 @@ export class Base {
   }
 
 
-  public get norman() { return this._norman; }
+  public get norman() {
+    return this._norman;
+  }
 
-  public get config() { return this._norman.config; }
+  public get config() {
+    return this._norman.config;
+  }
 }
 
 
@@ -20,5 +24,7 @@ export class ModuleBase extends Base {
   }
 
 
-  public get module() { return this._module; }
+  public get module() {
+    return this._module;
+  }
 }

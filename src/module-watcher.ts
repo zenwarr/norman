@@ -2,11 +2,11 @@ import * as chokidar from "chokidar";
 import chalk from "chalk";
 import * as path from "path";
 import * as fs from "fs-extra";
-import {Base, ModuleBase} from "./base";
-import {IGNORE_REGEXPS, ModuleInfo} from "./module-info";
-import {Norman} from "./norman";
-import {ModuleSynchronizer} from "./module-synchronizer";
-import {EventEmitter} from "events";
+import { Base, ModuleBase } from "./base";
+import { IGNORE_REGEXPS, ModuleInfo } from "./module-info";
+import { Norman } from "./norman";
+import { ModuleSynchronizer } from "./module-synchronizer";
+import { EventEmitter } from "events";
 import luxon = require("luxon");
 
 
@@ -36,7 +36,7 @@ export class ModulesFeeder extends Base {
   }
 
 
-  protected _pool: { [name: string]: ModuleWatcher | undefined } = { };
+  protected _pool: { [name: string]: ModuleWatcher | undefined } = {};
 
 
   protected async createWatcher(module: ModuleInfo, targetModule: ModuleInfo): Promise<ModuleWatcher> {
@@ -64,7 +64,7 @@ export class ModulesFeeder extends Base {
 
 
   protected async onDepsChanged(module: ModuleInfo): Promise<void> {
-    console.log(`Dependencies of module ${module.name} has changed, reinstalling it in dependent modules...`);
+    console.log(`Dependencies of module ${ module.name } has changed, reinstalling it in dependent modules...`);
     await this.stop();
     await this.start();
   }
@@ -114,7 +114,7 @@ export class ModuleWatcher extends ModuleBase {
     watcher.on("unlink", this.onRemoveFile.bind(this));
     watcher.on("addDir", this.onAddDir.bind(this));
     watcher.on("unlinkDir", this.onRemoveDir.bind(this));
-    watcher.on("error", error => console.log(chalk.red(`watcher error: ${error.message}`)));
+    watcher.on("error", error => console.log(chalk.red(`watcher error: ${ error.message }`)));
 
     this._watcher = watcher;
   }
@@ -148,7 +148,7 @@ export class ModuleWatcher extends ModuleBase {
         this.logChange("NEW", sourceFilePath, syncTarget, targetFiles);
       }
     } catch (error) {
-      console.log(chalk.yellow(`Error (ADD): ${error.message}`));
+      console.log(chalk.yellow(`Error (ADD): ${ error.message }`));
     }
   }
 
@@ -168,7 +168,7 @@ export class ModuleWatcher extends ModuleBase {
         this.logChange("UPD", sourceFilePath, syncTarget, targetFiles);
       }
     } catch (error) {
-      console.log(chalk.yellow(`Error (UPD): ${error.message}`));
+      console.log(chalk.yellow(`Error (UPD): ${ error.message }`));
     }
   }
 
@@ -192,7 +192,7 @@ export class ModuleWatcher extends ModuleBase {
         this.logChange("DEL", sourceFilePath, syncTarget, targetFilePath);
       }
     } catch (error) {
-      console.log(chalk.yellow(`Error (DEL): ${error.message}`));
+      console.log(chalk.yellow(`Error (DEL): ${ error.message }`));
     }
   }
 
@@ -220,7 +220,7 @@ export class ModuleWatcher extends ModuleBase {
         this.logChange("NEW", sourceFilePath, syncTarget, targetFilePath);
       }
     } catch (error) {
-      console.log(chalk.yellow(`Error (ADD): ${error.message}`));
+      console.log(chalk.yellow(`Error (ADD): ${ error.message }`));
     }
   }
 
@@ -241,19 +241,19 @@ export class ModuleWatcher extends ModuleBase {
         this.logChange("DEL", sourceFilePath, syncTarget, targetFilePath);
       }
     } catch (error) {
-      console.log(chalk.yellow(`Error (DEL): ${error.message}`));
+      console.log(chalk.yellow(`Error (DEL): ${ error.message }`));
     }
   }
 
 
   protected logChange(event: string, sourceFilePath: string, moduleAppPath: string, targetFiles: string | string[]): void {
     if (!Array.isArray(targetFiles)) {
-      targetFiles = [targetFiles];
+      targetFiles = [ targetFiles ];
     }
 
     let ts = luxon.DateTime.local().toLocaleString(luxon.DateTime.TIME_24_WITH_SECONDS);
 
-    targetFiles.forEach(targetFilePath => console.log(`${ts} ${event}: [${this.module.name}] ${path.relative(moduleAppPath, targetFilePath)}`));
+    targetFiles.forEach(targetFilePath => console.log(`${ ts } ${ event }: [${ this.module.name }] ${ path.relative(moduleAppPath, targetFilePath) }`));
   }
 
 
@@ -267,7 +267,7 @@ export class ModuleWatcher extends ModuleBase {
     }
 
     await this.module.copyFile(sourceFilePath, targetFilePath);
-    return [targetFilePath];
+    return [ targetFilePath ];
   }
 
 

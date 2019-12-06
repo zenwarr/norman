@@ -56,7 +56,7 @@ export class LocalNpmServer extends Base {
 
     this.app.get("/tarballs/:org/:package", (req, res) => {
       // tslint:disable-next-line no-floating-promises
-      this.onGetTarball(`${req.params.org}/${req.params.package}`, req, res);
+      this.onGetTarball(`${ req.params.org }/${ req.params.package }`, req, res);
     });
 
     this.app.get("/:package", (req, res) => {
@@ -66,7 +66,7 @@ export class LocalNpmServer extends Base {
 
     this.app.get("/:org/:package", (req, res) => {
       // tslint:disable-next-line no-floating-promises
-      this.onGetPackage(`${req.params.org}/${req.params.package}`, req, res);
+      this.onGetPackage(`${ req.params.org }/${ req.params.package }`, req, res);
     });
   }
 
@@ -75,7 +75,7 @@ export class LocalNpmServer extends Base {
     if (this.port == null) {
       throw new Error("Cannot get npm server address: server not started yet");
     } else {
-      return `http://localhost:${this.port}`;
+      return `http://localhost:${ this.port }`;
     }
   }
 
@@ -86,7 +86,7 @@ export class LocalNpmServer extends Base {
     return new Promise<void>((resolve, reject) => {
       this.server = this.app.listen(0, () => {
         this.port = (this.server!.address() as AddressInfo).port;
-        console.log(`Local npm server listening on ${this.port}`);
+        console.log(`Local npm server listening on ${ this.port }`);
         resolve();
       });
     });
@@ -125,14 +125,14 @@ export class LocalNpmServer extends Base {
 
         let token = this.getTokenForUrl(registry);
         if (token) {
-          headers.authorization = `Bearer ${token}`;
+          headers.authorization = `Bearer ${ token }`;
         }
 
         if (registry.endsWith("/")) {
           registry = registry.slice(0, -1);
         }
 
-        let response = await request.get(`${registry}/${packageName}`, {
+        let response = await request.get(`${ registry }/${ packageName }`, {
           headers,
           resolveWithFullResponse: true,
           gzip: true
@@ -141,14 +141,14 @@ export class LocalNpmServer extends Base {
         let parsedContentType = contentType.parse(response.headers["content-type"]);
         if (parsedContentType.type === "application/vnd.npm.install-v1+json" || parsedContentType.type === "application/json") {
           let json = JSON.parse(response.body);
-          for (let version of Object.keys(json.versions || { })) {
+          for (let version of Object.keys(json.versions || {})) {
             let versionObject = json.versions[version];
             if (versionObject.dist && versionObject.dist.tarball) {
-              versionObject.dist.tarball = `${this.myServerAddress}/tarballs/${encodeURIComponent(packageName)}?url=${encodeURIComponent(versionObject.dist.tarball)}`;
+              versionObject.dist.tarball = `${ this.myServerAddress }/tarballs/${ encodeURIComponent(packageName) }?url=${ encodeURIComponent(versionObject.dist.tarball) }`;
             }
           }
 
-          let responseHeaders = { ... response.headers };
+          let responseHeaders = { ...response.headers };
           delete responseHeaders["content-encoding"];
           delete responseHeaders["transfer-encoding"];
 
@@ -161,7 +161,7 @@ export class LocalNpmServer extends Base {
           res.status(error.statusCode).set(error.response.headers).send(error.response.body);
         } else {
           res.status(500).send("Internal error: " + error.message);
-          console.log(`error while fetching package info ${packageName}: ${error}`);
+          console.log(`error while fetching package info ${ packageName }: ${ error }`);
         }
       }
     }
@@ -172,7 +172,7 @@ export class LocalNpmServer extends Base {
     let org = packageName.startsWith("@") ? packageName.slice(0, packageName.indexOf("/")) : "";
     let result = org ? this.npmConfig.registries[org] || this.npmConfig.registries.default : this.npmConfig.registries.default;
     if (!result) {
-      throw new Error(`Npm registry for package ${packageName} not found`);
+      throw new Error(`Npm registry for package ${ packageName } not found`);
     }
     return result;
   }
@@ -199,10 +199,10 @@ export class LocalNpmServer extends Base {
     let versionObject: any = {
       name: module.name,
       version: moduleVersion,
-      directories: { },
+      directories: {},
       _hasShrinkwrap: false,
       dist: {
-        tarball: `${this.myServerAddress}/tarballs/${module.name}`
+        tarball: `${ this.myServerAddress }/tarballs/${ module.name }`
       }
     };
 
@@ -235,7 +235,7 @@ export class LocalNpmServer extends Base {
 
         let archivePath: string;
 
-        let packagedDirPath = path.join(TEMP_DIR, `${packageName}-${stateHash}`);
+        let packagedDirPath = path.join(TEMP_DIR, `${ packageName }-${ stateHash }`);
 
         let packager = localModule.createPackager();
         if (fs.existsSync(packagedDirPath)) {
@@ -262,7 +262,7 @@ export class LocalNpmServer extends Base {
 
         let token = this.getTokenForUrl(req.query.url);
         if (token) {
-          headers.authorization = `Bearer ${token}`;
+          headers.authorization = `Bearer ${ token }`;
         }
 
         let response = await request.get(req.query.url, {
@@ -279,7 +279,7 @@ export class LocalNpmServer extends Base {
           res.status(error.statusCode).set(error.response.headers).send(error.response.body);
         } else {
           res.status(500).set(error.headers).send(error.body);
-          console.log(`error while proxying URL ${req.query.url}: ${error}`);
+          console.log(`error while proxying URL ${ req.query.url }: ${ error }`);
         }
       }
     }
@@ -308,7 +308,7 @@ export class LocalNpmServer extends Base {
 
     for (let key of Object.keys(this.npmConfig.registries)) {
       if (key !== "default") {
-        result[`npm_config_${key}:registry`] = this.myServerAddress;
+        result[`npm_config_${ key }:registry`] = this.myServerAddress;
       }
     }
 
@@ -324,24 +324,24 @@ export class LocalNpmServer extends Base {
       let npmrcText = "";
       try {
         npmrcText = fs.readFileSync(filename, { encoding: "utf-8" });
-        console.log(`Loaded npm config from ${filename}`);
+        console.log(`Loaded npm config from ${ filename }`);
       } catch (error) {
         if (error.code !== "ENOENT") {
-          console.log(chalk.red(`Failed to load npm config file ${filename}: ${error.message}`));
+          console.log(chalk.red(`Failed to load npm config file ${ filename }: ${ error.message }`));
         }
 
         return {
-          registries: { },
-          tokens: { },
-          other: { }
+          registries: {},
+          tokens: {},
+          other: {}
         };
       }
 
       let parsedConfig = ini.parse(npmrcText);
       let npmConfig: NpmConfig = {
-        registries: { },
-        tokens: { },
-        other: { }
+        registries: {},
+        tokens: {},
+        other: {}
       };
 
       for (let key of Object.keys(parsedConfig)) {
@@ -423,12 +423,12 @@ export class LocalNpmServer extends Base {
 
       return resultObj;
     }
-    return { };
+    return {};
   }
 
 
   public async upgradeDependency(mod: ModuleInfo, pkg: string, version: string): Promise<void> {
-    await utils.runCommand(utils.getNpmExecutable(), [ "install", `${pkg}@${version}` ], {
+    await utils.runCommand(utils.getNpmExecutable(), [ "install", `${ pkg }@${ version }` ], {
       cwd: mod.path,
       env: this.buildNpmEnv(mod)
     });

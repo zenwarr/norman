@@ -36,7 +36,7 @@ export class ModuleSynchronizer extends ModuleBase {
         // check if the dependency is installed into node_modules of the current module
         let installedDepPath = path.join(this.module.path, "node_modules", module.name);
         if (!fs.existsSync(installedDepPath)) {
-          console.log(`Reinstalling dependencies because module ${module.name} is not installed`);
+          console.log(`Reinstalling dependencies because module ${ module.name } is not installed`);
           runInstall = true;
           return;
         }
@@ -49,7 +49,7 @@ export class ModuleSynchronizer extends ModuleBase {
         if (depsEqual) {
           await (new ModuleSynchronizer(this.norman, module)).quickSyncTo(this.module);
         } else {
-          console.log(`Reinstalling dependencies because module ${module.name} dependencies have changed`);
+          console.log(`Reinstalling dependencies because module ${ module.name } dependencies have changed`);
           fs.removeSync(installedDepPath);
           runInstall = true;
         }
@@ -57,7 +57,7 @@ export class ModuleSynchronizer extends ModuleBase {
 
       let firstMissing = utils.getFirstMissingDependency(this.module.path);
       if (firstMissing != null) {
-        console.log(`Reinstalling dependencies because module ${firstMissing} is not installed`);
+        console.log(`Reinstalling dependencies because module ${ firstMissing } is not installed`);
         runInstall = true;
       }
     }
@@ -74,7 +74,7 @@ export class ModuleSynchronizer extends ModuleBase {
   protected async quickSyncTo(syncToModule: ModuleInfo): Promise<void> {
     let syncTarget = path.join(syncToModule.path, "node_modules", this.module.name);
     if (utils.isSymlink(syncTarget)) {
-      console.log(chalk.yellow(`Skipping sync into "${syncTarget}" because it is a linked dependency`));
+      console.log(chalk.yellow(`Skipping sync into "${ syncTarget }" because it is a linked dependency`));
       return;
     }
 
@@ -84,7 +84,7 @@ export class ModuleSynchronizer extends ModuleBase {
     if (filesCopied || filesRemoved) {
       let source = chalk.green(this.module.name);
       let target = chalk.green(syncToModule.name);
-      console.log(`${source} -> ${target}: copied ${filesCopied}, removed ${filesRemoved}`);
+      console.log(`${ source } -> ${ target }: copied ${ filesCopied }, removed ${ filesRemoved }`);
     }
   }
 
@@ -95,7 +95,7 @@ export class ModuleSynchronizer extends ModuleBase {
   private async quickSyncCopy(syncTarget: string): Promise<number> {
     let filesCopied = 0;
 
-    await this.module.walkModuleFiles(async(filename: string, stat: fs.Stats) => {
+    await this.module.walkModuleFiles(async (filename: string, stat: fs.Stats) => {
       if (!this.module.isFileShouldBePublished(filename)) {
         return;
       }
@@ -128,7 +128,7 @@ export class ModuleSynchronizer extends ModuleBase {
       }
     } catch (error) {
       if (error.code !== "ENOENT") {
-        console.log(chalk.red(`Error while copying to ${target}: ${error.message}`));
+        console.log(chalk.red(`Error while copying to ${ target }: ${ error.message }`));
         return false;
       }
     }
@@ -172,14 +172,14 @@ export class ModuleSynchronizer extends ModuleBase {
 
 
   private async quickSyncRemove(syncTarget: string): Promise<number> {
-    let filesToRemove: [string, fs.Stats][] = [];
+    let filesToRemove: [ string, fs.Stats ][] = [];
 
-    await utils.walkDirectoryFiles(syncTarget, async(filename, stat) => {
+    await utils.walkDirectoryFiles(syncTarget, async (filename, stat) => {
       let relpath = path.relative(syncTarget, filename);
 
       let sourceFilename = path.join(this.module.path, relpath);
       if (!fs.existsSync(sourceFilename) || !this.module.isFileShouldBePublished(sourceFilename)) {
-        filesToRemove.push([filename, stat]);
+        filesToRemove.push([ filename, stat ]);
       }
     });
 
@@ -191,7 +191,7 @@ export class ModuleSynchronizer extends ModuleBase {
           fs.unlinkSync(item[0]);
         }
       } catch (error) {
-        console.log(`Failed to remove "${item[0]}]: ${error.message}`);
+        console.log(`Failed to remove "${ item[0] }]: ${ error.message }`);
       }
     });
 

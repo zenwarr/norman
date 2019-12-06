@@ -1,4 +1,4 @@
-import {Base} from "./base";
+import { Base } from "./base";
 
 
 export default class ModuleFetcher extends Base {
@@ -7,7 +7,7 @@ export default class ModuleFetcher extends Base {
       try {
         await module.fetch();
       } catch (error) {
-        console.error(`Failed to fetch module: ${error.message}`);
+        console.error(`Failed to fetch module: ${ error.message }`);
       }
     }
   }

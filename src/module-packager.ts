@@ -1,7 +1,7 @@
 import * as fs from "fs-extra";
 import * as path from "path";
 import * as utils from "./utils";
-import {ModuleBase} from "./base";
+import { ModuleBase } from "./base";
 import * as os from "os";
 
 
@@ -18,9 +18,9 @@ export class ModulePackager extends ModuleBase {
       fs.mkdirpSync(TEMP_DIR);
     }
 
-    let tempDir = path.join(TEMP_DIR, `${this.module.name}-${stateHash}`);
+    let tempDir = path.join(TEMP_DIR, `${ this.module.name }-${ stateHash }`);
 
-    await this.module.walkModuleFiles(async(source, stat) => {
+    await this.module.walkModuleFiles(async (source, stat) => {
       let relativeSourceFileName = path.relative(this.module.path, source);
       if (relativeSourceFileName === ".gitignore" || relativeSourceFileName === ".npmignore") {
         return;
@@ -58,9 +58,9 @@ export class ModulePackager extends ModuleBase {
 
     let archiveName: string;
     if (this.module.npmName.org) {
-      archiveName = `${this.module.npmName.org}-${this.module.npmName.pkg}-${moduleVersion}.tgz`;
+      archiveName = `${ this.module.npmName.org }-${ this.module.npmName.pkg }-${ moduleVersion }.tgz`;
     } else {
-      archiveName = `${this.module.npmName.pkg}-${moduleVersion}.tgz`;
+      archiveName = `${ this.module.npmName.pkg }-${ moduleVersion }.tgz`;
     }
 
     return path.join(outPath, archiveName);

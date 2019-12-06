@@ -1,13 +1,13 @@
-import {Config} from "./config";
+import { Config } from "./config";
 import * as path from "path";
 import * as fs from "fs-extra";
 import gitUrlParse = require("git-url-parse");
 import * as utils from "./utils";
-import {BUILD_TAG, ModuleStateManager} from "./module-state-manager";
-import {Norman} from "./norman";
+import { BUILD_TAG, ModuleStateManager } from "./module-state-manager";
+import { Norman } from "./norman";
 import ignore from "ignore";
-import {ModulePackager} from "./module-packager";
-import {Base} from "./base";
+import { ModulePackager } from "./module-packager";
+import { Base } from "./base";
 
 
 interface RawModuleConfig {
@@ -62,17 +62,29 @@ export class ModuleInfo extends Base {
   private _buildTriggers: string[];
 
 
-  public get name(): string { return this._npmName.name; }
+  public get name(): string {
+    return this._npmName.name;
+  }
 
-  public get npmName(): ModuleNpmName { return this._npmName; }
+  public get npmName(): ModuleNpmName {
+    return this._npmName;
+  }
 
-  public get path(): string { return this._path; }
+  public get path(): string {
+    return this._path;
+  }
 
-  public get needsNpmInstall(): boolean { return this._npmInstall; }
+  public get needsNpmInstall(): boolean {
+    return this._npmInstall;
+  }
 
-  public get isMain(): boolean { return this._isMain; }
+  public get isMain(): boolean {
+    return this._isMain;
+  }
 
-  public get buildTriggers(): string[] { return this._buildTriggers; }
+  public get buildTriggers(): string[] {
+    return this._buildTriggers;
+  }
 
 
   private constructor(init: ModuleInfoInit, norman: Norman) {
@@ -230,7 +242,9 @@ export class ModuleInfo extends Base {
   }
 
 
-  public createPackager(): ModulePackager { return new ModulePackager(this.norman, this); }
+  public createPackager(): ModulePackager {
+    return new ModulePackager(this.norman, this);
+  }
 
 
   public async install(): Promise<void> {
@@ -329,7 +343,7 @@ export class ModuleInfo extends Base {
 
 
   public async walkModuleFiles(walker: (filename: string, state: fs.Stats) => Promise<void>): Promise<void> {
-    const handle = async(source: string) => {
+    const handle = async (source: string) => {
       if (!this.isModuleFile(source)) {
         return;
       }
@@ -415,7 +429,7 @@ function npmNameFromPackageName(name: string): ModuleNpmName {
     if (org.startsWith("@")) {
       org = org.slice(1);
     }
-    return { org, pkg, name: `@${org}/${pkg}` };
+    return { org, pkg, name: `@${ org }/${ pkg }` };
   } else {
     return { org: "", pkg: name, name };
   }

@@ -1,14 +1,14 @@
-import {ModuleSynchronizer} from "./module-synchronizer";
+import { ModuleSynchronizer } from "./module-synchronizer";
 import ModuleFetcher from "./fetcher";
 import chalk from "chalk";
 import * as path from "path";
-import {ArgumentParser} from "argparse";
-import {LocalNpmServer} from "./server";
-import {ModuleStateManager} from "./module-state-manager";
-import {Config} from "./config";
-import {ModuleInfo} from "./module-info";
-import {ModulePackager} from "./module-packager";
-import {ModulesFeeder} from "./module-watcher";
+import { ArgumentParser } from "argparse";
+import { LocalNpmServer } from "./server";
+import { ModuleStateManager } from "./module-state-manager";
+import { Config } from "./config";
+import { ModuleInfo } from "./module-info";
+import { ModulePackager } from "./module-packager";
+import { ModulesFeeder } from "./module-watcher";
 import { FileTransformerPlugin, SourceMapPlugin } from "./plugin";
 
 
@@ -46,7 +46,7 @@ export class Norman {
   private _server: LocalNpmServer | null = null;
   private _config: Config | null = null;
   private _args!: Arguments;
-  private _plugins: FileTransformerPlugin[] = [new SourceMapPlugin()];
+  private _plugins: FileTransformerPlugin[] = [ new SourceMapPlugin() ];
 
 
   public get args(): Arguments {
@@ -54,7 +54,9 @@ export class Norman {
   }
 
 
-  public get plugins() { return this._plugins; }
+  public get plugins() {
+    return this._plugins;
+  }
 
 
   public get moduleFetcher(): ModuleFetcher {
@@ -206,7 +208,7 @@ export class Norman {
   protected async handleListModulesCommand(): Promise<void> {
     console.log(chalk.green("-- BEGIN MODULES LIST"));
     for (let module of this.config.modules) {
-      console.log(`${module.name}: ${module.path}`);
+      console.log(`${ module.name }: ${ module.path }`);
     }
     console.log(chalk.green("-- END MODULES LIST"));
 
@@ -223,7 +225,7 @@ export class Norman {
 
     const printTree = (leaf: ModuleInfo, level: number = 0) => {
       let prefix = level === 0 ? (isFirst ? "- " : "\n- ") : " ".repeat(level * 2 + 2);
-      console.log(`${prefix}${leaf.name}`);
+      console.log(`${ prefix }${ leaf.name }`);
 
       let root = tree.find(treeLeaf => treeLeaf.module.name === leaf.name);
       if (root) {
@@ -316,20 +318,20 @@ export class Norman {
         });
 
         if (!localModule) {
-          console.log(chalk.red(`No local module found with name "${argPath}" or at "${argPath}"`));
+          console.log(chalk.red(`No local module found with name "${ argPath }" or at "${ argPath }"`));
           process.exit(-1);
           throw new Error();
         }
       }
 
       if (!localModule.needsNpmInstall) {
-        console.log(chalk.red(`Cannot sync module: 'npmInstall' for module ${localModule.name} is false`));
+        console.log(chalk.red(`Cannot sync module: 'npmInstall' for module ${ localModule.name } is false`));
         process.exit(-1);
         return;
       }
 
       if (args.watch) {
-        let feeder = new ModulesFeeder(this, [localModule]);
+        let feeder = new ModulesFeeder(this, [ localModule ]);
         await feeder.start();
       } else {
         let synchronizer = new ModuleSynchronizer(this, localModule);
@@ -365,7 +367,7 @@ export class Norman {
           let synchronizer = new ModuleSynchronizer(this, localModule);
           await synchronizer.sync(buildDeps);
         } else {
-          console.log(chalk.yellow(`Skipping sync for module ${localModule.name} because npmInstall for this module is false`));
+          console.log(chalk.yellow(`Skipping sync for module ${ localModule.name } because npmInstall for this module is false`));
         }
       });
     } finally {
@@ -385,12 +387,12 @@ export class Norman {
     await this._server.start();
 
     try {
-      let results: any = { };
+      let results: any = {};
       let index = 1;
 
       let modsToAnalyze = args.withIncluded ? this.config.modules : this.config.modules.filter(mod => mod.isMain);
       for (let mod of modsToAnalyze) {
-        console.log(`[${index}/${modsToAnalyze.length}] Analyzing dependencies of "${mod.name}"...`);
+        console.log(`[${ index }/${ modsToAnalyze.length }] Analyzing dependencies of "${ mod.name }"...`);
         ++index;
 
         let result = await this._server.getOutdated(mod);
@@ -412,7 +414,7 @@ export class Norman {
 
 
   protected buildOutdatedReport(outdatedData: any): string {
-    let depGroups: any = { };
+    let depGroups: any = {};
 
     for (let mod of Object.keys(outdatedData)) {
       for (let dep of Object.keys(outdatedData[mod])) {
@@ -436,7 +438,7 @@ export class Norman {
 
         let wanted = depData.wanted !== depData.current ? chalk.yellow(depData.wanted) : depData.wanted;
         let latest = depData.latest !== depData.wanted ? chalk.red(depData.latest) : depData.latest;
-        lines.push(`  ${mod}: installed ${depData.current}, wanted ${wanted}, latest ${latest}`);
+        lines.push(`  ${ mod }: installed ${ depData.current }, wanted ${ wanted }, latest ${ latest }`);
       }
     }
 
@@ -462,11 +464,11 @@ export class Norman {
           continue;
         }
 
-        console.log(`Upgrading dependencies of "${mod.name}": "${dep}@${depData.current}" -> "${dep}@${installVersion}"`);
+        console.log(`Upgrading dependencies of "${ mod.name }": "${ dep }@${ depData.current }" -> "${ dep }@${ installVersion }"`);
         try {
           await this._server!.upgradeDependency(mod, dep, installVersion);
         } catch (error) {
-          console.error(chalk.red(`Failed to upgrade dependency of "${mod.name}": "${dep}" to version ${installVersion}`));
+          console.error(chalk.red(`Failed to upgrade dependency of "${ mod.name }": "${ dep }" to version ${ installVersion }`));
         }
       }
     }
@@ -525,7 +527,7 @@ export function start(): void {
   let norman = new Norman();
 
   norman.start().catch((error: Error) => {
-    console.log(chalk.red(`Error: ${error.message}`));
+    console.log(chalk.red(`Error: ${ error.message }`));
     console.error(error);
     process.exit(-1);
   });
@@ -533,11 +535,11 @@ export function start(): void {
 
 
 process.on("uncaughtException", (error) => {
-  console.log(chalk.red(`UNHANDLED EXCEPTION: ${error.message}: ${error.stack}`));
+  console.log(chalk.red(`UNHANDLED EXCEPTION: ${ error.message }: ${ error.stack }`));
   process.exit(-1);
 });
 
 process.on("unhandledRejection", (error: any) => {
-  console.log(chalk.red(`UNHANDLED REJECTION: ${error.message}: ${error.stack}`));
+  console.log(chalk.red(`UNHANDLED REJECTION: ${ error.message }: ${ error.stack }`));
   process.exit(-1);
 });

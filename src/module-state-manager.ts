@@ -25,9 +25,9 @@ const STATE_DIR = path.join(os.homedir(), ".norman-state");
 
 export class ModuleStateManager extends ModuleBase {
   public async loadActualState(): Promise<ModuleState> {
-    const resultFiles: ModuleStateFiles = { };
+    const resultFiles: ModuleStateFiles = {};
 
-    await this.module.walkModuleFiles(async(filename, stat) => {
+    await this.module.walkModuleFiles(async (filename, stat) => {
       resultFiles[filename] = stat.mtime.valueOf();
     });
 
@@ -67,7 +67,7 @@ export class ModuleStateManager extends ModuleBase {
     }
 
     if (!loadedState) {
-      throw new Error(`Invalid state file: ${stateFilePath}`);
+      throw new Error(`Invalid state file: ${ stateFilePath }`);
     }
 
     if (!(stateTag in loadedState)) {
@@ -77,7 +77,7 @@ export class ModuleStateManager extends ModuleBase {
 
     let data = loadedState.data;
     if (!data || !Array.isArray(data)) {
-      throw new Error(`Invalid state file: ${stateFilePath}`);
+      throw new Error(`Invalid state file: ${ stateFilePath }`);
     }
 
     for (let entry of data as ModuleState[]) {
@@ -105,7 +105,7 @@ export class ModuleStateManager extends ModuleBase {
     }
 
     if (!loadedStateFile) {
-      loadedStateFile = { };
+      loadedStateFile = {};
     }
 
     let stateForTag: { data: ModuleState[] } = loadedStateFile[stateTag] || { data: [] };
@@ -145,7 +145,7 @@ export class ModuleStateManager extends ModuleBase {
 
   public pathToStateFile(): string {
     let hash = crypto.createHash("sha256").update(this.module.path).digest("hex");
-    return path.join(STATE_DIR, `state-${hash}.json`);
+    return path.join(STATE_DIR, `state-${ hash }.json`);
   }
 
 
@@ -166,7 +166,7 @@ export class ModuleStateManager extends ModuleBase {
 
     for (let filename of Object.keys(prevStateBuildDeps)) {
       if (!currentStateBuildDeps[filename] || currentStateBuildDeps[filename] > prevStateBuildDeps[filename]) {
-        console.log(`rebuilding ${this.module.name}, detected change: ${filename}`);
+        console.log(`rebuilding ${ this.module.name }, detected change: ${ filename }`);
         return true;
       }
     }
@@ -176,7 +176,7 @@ export class ModuleStateManager extends ModuleBase {
 
 
   private filterBuildTriggers(stateFiles: ModuleStateFiles): ModuleStateFiles {
-    let result: ModuleStateFiles = { };
+    let result: ModuleStateFiles = {};
     for (let filename of Object.keys(stateFiles)) {
       if (this.isBuildTrigger(filename)) {
         result[filename] = stateFiles[filename];
@@ -192,7 +192,7 @@ export class ModuleStateManager extends ModuleBase {
     }
 
     for (let pattern of this.module.buildTriggers) {
-      if (mimimatch(filename, pattern, { matchBase: true})) {
+      if (mimimatch(filename, pattern, { matchBase: true })) {
         return true;
       }
     }

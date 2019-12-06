@@ -21,20 +21,20 @@ export async function runCommand(command: string, args: string[] | null, options
     let silent = options && options.silent === true;
 
     if (!silent) {
-      let inClause = options && options.cwd ? `(in ${options.cwd})` : "";
+      let inClause = options && options.cwd ? `(in ${ options.cwd })` : "";
       if (args == null) {
-        console.log(chalk.cyan(`→ ${command} ${inClause}`));
+        console.log(chalk.cyan(`→ ${ command } ${ inClause }`));
       } else {
-        console.log(chalk.cyan(`→ ${command} ${args.join(" ")} ${inClause}`));
+        console.log(chalk.cyan(`→ ${ command } ${ args.join(" ") } ${ inClause }`));
       }
     }
 
-    let defOptions = options && options.collectOutput === true ? { } : {
+    let defOptions = options && options.collectOutput === true ? {} : {
       stdio: silent ? "ignore" : "inherit",
       stderr: silent ? "ignore" : "inherit"
     };
 
-    let params = Object.assign(defOptions, options || { });
+    let params = Object.assign(defOptions, options || {});
 
     let proc: child_process.ChildProcess;
     if (args == null) {
@@ -61,13 +61,13 @@ export async function runCommand(command: string, args: string[] | null, options
       } else {
         logProcessExecuteError(code, command, args, options);
 
-        reject(new Error(`Process exited with code ${code}`));
+        reject(new Error(`Process exited with code ${ code }`));
       }
     });
 
     proc.on("error", error => {
       if (!silent) {
-        console.log(chalk.red(`→ ERROR: ${error.message}`));
+        console.log(chalk.red(`→ ERROR: ${ error.message }`));
       }
       reject(error);
     });
@@ -81,7 +81,7 @@ function logProcessExecuteError(exitCode: number, command: string, args: null | 
     console.log(chalk.redBright("  " + command));
   } else {
     const commandParams = args.join(" ");
-    console.log(chalk.redBright(`  ${command} ${commandParams}`));
+    console.log(chalk.redBright(`  ${ command } ${ commandParams }`));
   }
 
   if (options && options.cwd) {
@@ -90,7 +90,7 @@ function logProcessExecuteError(exitCode: number, command: string, args: null | 
 
   if (exitCode === 127) {
     if (args == null) {
-      console.log(chalk.red(`Please make sure executable exists, or, in case or running npm script, make sure that script ${command} exists`));
+      console.log(chalk.red(`Please make sure executable exists, or, in case or running npm script, make sure that script ${ command } exists`));
     } else {
       console.log(chalk.red("Please make sure executable exists"));
     }
@@ -136,7 +136,7 @@ export function getFirstMissingDependency(packagePath: string, includeDev: boole
 
 
 export async function walkDirectoryFiles(startDir: string, walker: (filename: string, stat: fs.Stats) => Promise<void>): Promise<void> {
-  const handle = async(filename: string) => {
+  const handle = async (filename: string) => {
     let stat: fs.Stats;
 
     try {

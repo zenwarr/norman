@@ -1,9 +1,9 @@
-import {ModuleInfo} from "./module-info";
+import { ModuleInfo } from "./module-info";
 import * as path from "path";
 import * as fs from "fs-extra";
-import {ModuleInfoWithDeps} from "./server";
+import { ModuleInfoWithDeps } from "./server";
 import * as utils from "./utils";
-import {Norman} from "./norman";
+import { Norman } from "./norman";
 import chalk from "chalk";
 
 
@@ -44,21 +44,37 @@ export class Config {
   private _defaultBuildTriggers: string[];
 
 
-  public get mainConfigDir(): string { return this._mainConfigDir; }
+  public get mainConfigDir(): string {
+    return this._mainConfigDir;
+  }
 
-  public get mainModulesDir(): string { return this._mainModulesDir; }
+  public get mainModulesDir(): string {
+    return this._mainModulesDir;
+  }
 
-  public get defaultBranch(): string { return this._defaultBranch; }
+  public get defaultBranch(): string {
+    return this._defaultBranch;
+  }
 
-  public get defaultIgnoreOrg(): boolean { return this._defaultIgnoreOrg; }
+  public get defaultIgnoreOrg(): boolean {
+    return this._defaultIgnoreOrg;
+  }
 
-  public get defaultNpmIgnoreHint(): string | boolean { return this._defaultNpmIgnoreHint; }
+  public get defaultNpmIgnoreHint(): string | boolean {
+    return this._defaultNpmIgnoreHint;
+  }
 
-  public get defaultNpmInstall(): boolean { return this._defaultNpmInstall; }
+  public get defaultNpmInstall(): boolean {
+    return this._defaultNpmInstall;
+  }
 
-  public get defaultBuildTriggers(): string[] { return this._defaultBuildTriggers; }
+  public get defaultBuildTriggers(): string[] {
+    return this._defaultBuildTriggers;
+  }
 
-  public get modules(): ModuleInfo[] { return this._modules; }
+  public get modules(): ModuleInfo[] {
+    return this._modules;
+  }
 
 
   public constructor(init: ConfigInit) {
@@ -104,7 +120,7 @@ export class Config {
       return walkedModules.indexOf(module.name) >= 0;
     };
 
-    const walkModule = async(module: ModuleInfoWithDeps, parents: string[]) => {
+    const walkModule = async (module: ModuleInfoWithDeps, parents: string[]) => {
       if (isAlreadyWalked(module.module)) {
         return;
       }
@@ -112,7 +128,7 @@ export class Config {
       for (let dep of module.dependencies) {
         if (parents.indexOf(dep.name) >= 0) {
           // recursive dep
-          throw new Error(`Recursive dependency: ${dep.name}, required by ${parents.join(" -> ")}`);
+          throw new Error(`Recursive dependency: ${ dep.name }, required by ${ parents.join(" -> ") }`);
         }
 
         let depWithDeps = tree.find(mod => mod.module.name === dep.name);
@@ -189,7 +205,15 @@ export class Config {
       defaultBuildDeps = rawConfig.defaultBuildTriggers;
     }
 
-    let appConfig = new Config({ mainConfigDir, mainModulesDir, defaultIgnoreOrg, defaultNpmIgnorePath, defaultBranch, defaultNpmInstall, defaultBuildTriggers: defaultBuildDeps });
+    let appConfig = new Config({
+      mainConfigDir,
+      mainModulesDir,
+      defaultIgnoreOrg,
+      defaultNpmIgnorePath,
+      defaultBranch,
+      defaultNpmInstall,
+      defaultBuildTriggers: defaultBuildDeps
+    });
 
     appConfig._modules = this.loadModules(configFilename, rawConfig, appConfig, isMainConfig, ignoreMissing, norman);
 
@@ -219,11 +243,11 @@ export class Config {
           configPathStat = fs.statSync(configPath);
         } catch (error) {
           if (ignoreMissing) {
-            console.log(chalk.yellow(`Ignoring "includeModules" for "${configPath}", configuration file does not exist`));
+            console.log(chalk.yellow(`Ignoring "includeModules" for "${ configPath }", configuration file does not exist`));
             continue;
           }
 
-          throw new Error(`Failed to include config at ${configPath}: ${error.message}`);
+          throw new Error(`Failed to include config at ${ configPath }: ${ error.message }`);
         }
 
         if (configPathStat.isDirectory()) {
@@ -237,7 +261,7 @@ export class Config {
 
           modules = modules.concat(extraModules);
         } catch (error) {
-          throw new Error(`Failed to include modules from config at "${configPath}" (while parsing config at "${configFilename}": ${error.message}`);
+          throw new Error(`Failed to include modules from config at "${ configPath }" (while parsing config at "${ configFilename }": ${ error.message }`);
         }
       }
     }
@@ -263,7 +287,7 @@ export class Config {
   public static findAndLoadConfig(startDir: string, ignoreMissing: boolean, norman: Norman): Config {
     const findConfigForDir = (dir: string): string => {
       if (!dir || dir === "/" || dir === ".") {
-        throw new Error(`No ${CONFIG_FILE_NAME} found in directory tree`);
+        throw new Error(`No ${ CONFIG_FILE_NAME } found in directory tree`);
       }
 
       let configLocation = path.join(dir, CONFIG_FILE_NAME);
@@ -287,7 +311,7 @@ export class Config {
       return this.loadConfig(filename, JSON.parse(rawConfig), isMainConfig, ignoreMissing, norman);
     } catch (error) {
       // invalid config, stop here
-      throw new Error(`Invalid config file ${filename}: ${error.message}`);
+      throw new Error(`Invalid config file ${ filename }: ${ error.message }`);
     }
   }
 }
