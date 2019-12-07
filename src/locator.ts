@@ -1,7 +1,7 @@
 export class ServiceLocator {
   public initialize(name: string, service: unknown): void {
     if (this._services.has(name)) {
-      throw new Error(`Service "${ name } already initialized`);
+      throw new Error(`Service "${ name }" already initialized`);
     }
 
     this._services.set(name, service);
@@ -10,7 +10,7 @@ export class ServiceLocator {
   public get<T>(name: string): T {
     const service = this._services.get(name);
     if (!service) {
-      throw new Error(`Service ${ name } not found in service locator`);
+      throw new Error(`Service "${ name }" not found in service locator`);
     }
 
     return service as T;

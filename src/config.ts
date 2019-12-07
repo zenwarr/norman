@@ -10,14 +10,15 @@ const CONFIG_FILE_NAME = ".norman.json";
 
 
 interface RawConfig {
-  modules?: any;
-  modulesDirectory?: any;
-  defaultNpmIgnore?: any;
-  defaultIgnoreOrg?: any;
-  includeModules?: any;
-  defaultBranch?: any;
-  defaultNpmInstall?: any;
-  defaultBuildTriggers: any;
+  modules?: unknown;
+  modulesDirectory?: unknown;
+  defaultNpmIgnore?: unknown;
+  defaultIgnoreOrg?: unknown;
+  includeModules?: unknown;
+  defaultBranch?: unknown;
+  defaultNpmInstall?: unknown;
+  defaultBuildTriggers?: unknown;
+  defaultLockfileEnabled?: unknown;
 }
 
 
@@ -29,61 +30,52 @@ interface ConfigInit {
   defaultBranch: string;
   defaultNpmInstall: boolean;
   defaultBuildTriggers: string[];
+  defaultLockfileEnabled: boolean;
 }
 
 
 export class Config {
-  private _mainConfigDir: string;
-  private _mainModulesDir: string;
-  private _defaultIgnoreOrg: boolean;
-  private _defaultNpmIgnoreHint: string | boolean;
   private _modules: ModuleInfo[] = [];
-  private _defaultBranch: string;
-  private _defaultNpmInstall: boolean;
-  private _defaultBuildTriggers: string[];
-
 
   public get mainConfigDir(): string {
-    return this._mainConfigDir;
+    return this._config.mainConfigDir;
   }
 
   public get mainModulesDir(): string {
-    return this._mainModulesDir;
+    return this._config.mainModulesDir;
   }
 
   public get defaultBranch(): string {
-    return this._defaultBranch;
+    return this._config.defaultBranch;
   }
 
   public get defaultIgnoreOrg(): boolean {
-    return this._defaultIgnoreOrg;
+    return this._config.defaultIgnoreOrg;
   }
 
   public get defaultNpmIgnoreHint(): string | boolean {
-    return this._defaultNpmIgnoreHint;
+    return this._config.defaultNpmIgnorePath;
   }
 
   public get defaultNpmInstall(): boolean {
-    return this._defaultNpmInstall;
+    return this._config.defaultNpmInstall;
   }
 
   public get defaultBuildTriggers(): string[] {
-    return this._defaultBuildTriggers;
+    return this._config.defaultBuildTriggers;
   }
 
   public get modules(): ModuleInfo[] {
     return this._modules;
   }
 
+  public get defaultLockfileEnabled(): boolean {
+    return this._config.defaultLockfileEnabled;
+  }
 
-  protected constructor(init: ConfigInit) {
-    this._mainConfigDir = init.mainConfigDir;
-    this._mainModulesDir = init.mainModulesDir;
-    this._defaultIgnoreOrg = init.defaultIgnoreOrg;
-    this._defaultNpmIgnoreHint = init.defaultNpmIgnorePath;
-    this._defaultBranch = init.defaultBranch;
-    this._defaultNpmInstall = init.defaultNpmInstall;
-    this._defaultBuildTriggers = init.defaultBuildTriggers;
+
+  protected constructor(private _config: ConfigInit) {
+
   }
 
 
@@ -149,6 +141,14 @@ export class Config {
       defaultBuildDeps = rawConfig.defaultBuildTriggers;
     }
 
+    let defaultLockfileEnabled = false;
+    if ("defaultLockfileEnabled" in rawConfig) {
+      if (typeof rawConfig.defaultLockfileEnabled !== "boolean") {
+        throw new Error("'defaultLockfileEnabled' should be a boolean");
+      }
+      defaultLockfileEnabled = rawConfig.defaultLockfileEnabled;
+    }
+
     let appConfig = new Config({
       mainConfigDir,
       mainModulesDir,
@@ -156,7 +156,8 @@ export class Config {
       defaultNpmIgnorePath,
       defaultBranch,
       defaultNpmInstall,
-      defaultBuildTriggers: defaultBuildDeps
+      defaultBuildTriggers: defaultBuildDeps,
+      defaultLockfileEnabled
     });
 
     appConfig._modules = this.loadModules(configFilename, rawConfig, appConfig, isMainConfig, ignoreMissing);

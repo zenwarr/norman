@@ -11,16 +11,17 @@ import { getPluginManager } from "./plugins";
 
 
 interface RawModuleConfig {
-  branch: any;
-  name: any;
-  npmName: any;
-  ignoreOrg: any;
-  npmIgnore: any;
-  path: any;
-  repository: any;
-  buildCommands: any;
-  npmInstall: any;
-  buildTriggers: any;
+  branch?: unknown;
+  name?: unknown;
+  npmName?: unknown;
+  ignoreOrg?: unknown;
+  npmIgnore?: unknown;
+  path?: unknown;
+  repository?: unknown;
+  buildCommands?: unknown;
+  npmInstall?: unknown;
+  buildTriggers?: unknown;
+  lockfileEnabled?: unknown;
 }
 
 export interface ModuleNpmName {
@@ -38,9 +39,9 @@ export interface ModuleInfoInit {
   ignoreOrg: boolean;
   npmIgnorePath: string | null;
   npmInstall: boolean;
-  appConfig: Config;
   isMain: boolean;
   buildTriggers: string[];
+  lockfileEnabled: boolean;
 }
 
 export const IGNORE_REGEXPS = [
@@ -50,54 +51,37 @@ export const IGNORE_REGEXPS = [
 ];
 
 export class ModuleInfo {
-  private _repository: string | null;
-  private _npmName: ModuleNpmName;
-  private _buildCommands: string[];
-  private _branch: string;
-  private _path: string;
-  private _npmIgnorePath: string | null;
-  private _appConfig: Config;
-  private _npmInstall: boolean;
-  private _isMain: boolean;
-  private _buildTriggers: string[];
-
-
   public get name(): string {
-    return this._npmName.name;
+    return this._config.npmName.name;
   }
 
   public get npmName(): ModuleNpmName {
-    return this._npmName;
+    return this._config.npmName;
   }
 
   public get path(): string {
-    return this._path;
+    return this._config.path;
   }
 
   public get needsNpmInstall(): boolean {
-    return this._npmInstall;
+    return this._config.npmInstall;
   }
 
   public get isMain(): boolean {
-    return this._isMain;
+    return this._config.isMain;
   }
 
   public get buildTriggers(): string[] {
-    return this._buildTriggers;
+    return this._config.buildTriggers;
+  }
+
+  public get lockfileEnabled(): boolean {
+    return this._config.lockfileEnabled;
   }
 
 
-  private constructor(init: ModuleInfoInit) {
-    this._path = init.path;
-    this._repository = init.repository;
-    this._buildCommands = init.buildCommands;
-    this._branch = init.branch;
-    this._npmIgnorePath = init.npmIgnorePath;
-    this._npmName = init.npmName;
-    this._appConfig = init.appConfig;
-    this._npmInstall = init.npmInstall;
-    this._isMain = init.isMain;
-    this._buildTriggers = init.buildTriggers;
+  public constructor(private _config: ModuleInfoInit) {
+
   }
 
 
@@ -190,6 +174,14 @@ export class ModuleInfo {
       buildTriggers = rawConfig.buildTriggers;
     }
 
+    let lockfileEnabled: boolean = appConfig.defaultLockfileEnabled;
+    if ("lockfileEnabled" in rawConfig) {
+      if (typeof rawConfig.lockfileEnabled !== "boolean") {
+        throw new Error("'lockfileEnabled' should be a boolean");
+      }
+      lockfileEnabled = rawConfig.lockfileEnabled;
+    }
+
     return new ModuleInfo({
       repository,
       npmName,
@@ -198,10 +190,10 @@ export class ModuleInfo {
       path: modulePath,
       ignoreOrg,
       npmIgnorePath,
-      appConfig,
       npmInstall,
       isMain,
-      buildTriggers
+      buildTriggers,
+      lockfileEnabled
     });
   }
 
@@ -228,11 +220,11 @@ export class ModuleInfo {
 
 
   public async fetch(): Promise<void> {
-    if (!this._repository || fs.existsSync(this.path)) {
+    if (!this._config.repository || fs.existsSync(this.path)) {
       return;
     }
 
-    await utils.runCommand("git", [ "clone", this._repository, "-b", this._branch, this.path ]);
+    await utils.runCommand("git", [ "clone", this._config.repository, "-b", this._config.branch, this.path ]);
   }
 
 
@@ -269,7 +261,7 @@ export class ModuleInfo {
 
 
   protected async buildModule(): Promise<void> {
-    for (let buildCommand of this._buildCommands) {
+    for (let buildCommand of this._config.buildCommands) {
       if (this.hasScript(buildCommand)) {
         await utils.runCommand(utils.getNpmExecutable(), [ "run", buildCommand ], {
           cwd: this.path
@@ -331,9 +323,9 @@ export class ModuleInfo {
 
 
   protected get ignoreInstance(): any {
-    if (this._npmIgnorePath) {
+    if (this._config.npmIgnorePath) {
       let ignoreInstance = ignore();
-      ignoreInstance.add(fs.readFileSync(this._npmIgnorePath, "utf-8"));
+      ignoreInstance.add(fs.readFileSync(this._config.npmIgnorePath, "utf-8"));
       return ignoreInstance;
     } else {
       return null;

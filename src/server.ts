@@ -15,6 +15,8 @@ import { PACK_TAG } from "./module-state-manager";
 import { AddressInfo } from "net";
 import { getConfig } from "./config";
 import { ServiceLocator } from "./locator";
+import { getNpmRc } from "./npmrc";
+import { Lockfile } from "./lockfile";
 
 
 const accept = require("accept");
@@ -22,13 +24,6 @@ const accept = require("accept");
 
 const TEMP_DIR = path.join(os.tmpdir(), "norman");
 const TARBALL_CACHE_DIR = path.join(os.tmpdir(), "norman-cache");
-
-
-export type NpmConfig = {
-  registries: { [prefix: string]: string };
-  tokens: { [domain: string]: string };
-  other: { [key: string]: any };
-};
 
 
 export interface ModuleInfoWithDeps {
@@ -39,7 +34,6 @@ export interface ModuleInfoWithDeps {
 
 export class LocalNpmServer {
   protected app: express.Application;
-  protected npmConfig!: NpmConfig;
   protected port?: number;
   protected server: http.Server | null = null;
 
@@ -79,9 +73,6 @@ export class LocalNpmServer {
 
 
   public async start(): Promise<void> {
-    const config = getConfig();
-    this.npmConfig = this.loadNpmConfig(config.mainConfigDir, ".npmrc");
-
     return new Promise<void>((resolve, reject) => {
       this.server = this.app.listen(0, () => {
         this.port = (this.server!.address() as AddressInfo).port;
@@ -145,7 +136,7 @@ export class LocalNpmServer {
           for (let version of Object.keys(json.versions || {})) {
             let versionObject = json.versions[version];
             if (versionObject.dist && versionObject.dist.tarball) {
-              versionObject.dist.tarball = `${ this.myServerAddress }/tarballs/${ encodeURIComponent(packageName) }?url=${ encodeURIComponent(versionObject.dist.tarball) }`;
+              versionObject.dist.tarball = `${ this.myServerAddress }/tarballs/${ encodeURIComponent(packageName) }?url=${ encodeURIComponent(versionObject.dist.tarball) }&norman=remote`;
             }
           }
 
@@ -170,8 +161,10 @@ export class LocalNpmServer {
 
 
   protected getRegistryForPackage(packageName: string): string {
+    const npmrc = getNpmRc();
+
     let org = packageName.startsWith("@") ? packageName.slice(0, packageName.indexOf("/")) : "";
-    let result = org ? this.npmConfig.registries[org] || this.npmConfig.registries.default : this.npmConfig.registries.default;
+    let result = org ? npmrc.getCustomRegistry(org) || npmrc.defaultRegistry : npmrc.defaultRegistry;
     if (!result) {
       throw new Error(`Npm registry for package ${ packageName } not found`);
     }
@@ -182,7 +175,7 @@ export class LocalNpmServer {
   protected getTokenForUrl(registryUrl: string): string | null {
     let parsedUrl = url.parse(registryUrl);
     if (parsedUrl.host) {
-      return this.npmConfig.tokens[parsedUrl.host] || null;
+      return getNpmRc().getTokenForHost(parsedUrl.host) || null;
     }
     return null;
   }
@@ -203,7 +196,7 @@ export class LocalNpmServer {
       directories: {},
       _hasShrinkwrap: false,
       dist: {
-        tarball: `${ this.myServerAddress }/tarballs/${ module.name }`
+        tarball: `${ this.myServerAddress }/tarballs/${ module.name }?norman=local&name=${ encodeURIComponent(module.name) }`
       }
     };
 
@@ -309,79 +302,16 @@ export class LocalNpmServer {
   public buildNpmEnv(module: ModuleInfo): NodeJS.ProcessEnv {
     let result = process.env;
 
-    for (let key of Object.keys(this.npmConfig.registries)) {
+    for (let key of getNpmRc().getCustomRegistries()) {
       if (key !== "default") {
         result[`npm_config_${ key }:registry`] = this.myServerAddress;
       }
     }
 
     result.npm_config_registry = this.myServerAddress;
-    result["npm_config_package-lock"] = "false";
+    result["npm_config_package-lock"] = module.lockfileEnabled ? "true" : "false";
 
     return result;
-  }
-
-
-  protected loadNpmConfig(dir: string, projectConfigFileName: string): NpmConfig {
-    const loadNpmrc = (filename: string): NpmConfig => {
-      let npmrcText = "";
-      try {
-        npmrcText = fs.readFileSync(filename, { encoding: "utf-8" });
-        console.log(`Loaded npm config from ${ filename }`);
-      } catch (error) {
-        if (error.code !== "ENOENT") {
-          console.log(chalk.red(`Failed to load npm config file ${ filename }: ${ error.message }`));
-        }
-
-        return {
-          registries: {},
-          tokens: {},
-          other: {}
-        };
-      }
-
-      let parsedConfig = ini.parse(npmrcText);
-      let npmConfig: NpmConfig = {
-        registries: {},
-        tokens: {},
-        other: {}
-      };
-
-      for (let key of Object.keys(parsedConfig)) {
-        if (key === "registry") {
-          npmConfig.registries.default = parsedConfig[key];
-        } else if (key.endsWith(":registry")) {
-          npmConfig.registries[key.slice(0, key.indexOf(":"))] = parsedConfig[key];
-        } else if (key.endsWith(":_authToken")) {
-          let registryUrl = key.slice(0, -":_authToken".length);
-          if (registryUrl.startsWith("//")) {
-            registryUrl = "http:" + registryUrl;
-          }
-
-          let parsedUrl = url.parse(registryUrl);
-          if (parsedUrl.host) {
-            npmConfig.tokens[parsedUrl.host] = parsedConfig[key];
-          }
-        } else {
-          npmConfig.other[key] = parsedConfig[key];
-        }
-      }
-
-      return npmConfig;
-    };
-
-    let projectConfig = loadNpmrc(path.join(dir, projectConfigFileName));
-    let profileConfig = loadNpmrc(path.join(os.homedir(), ".npmrc"));
-
-    if (!projectConfig.registries.default && !profileConfig.registries.default) {
-      throw new Error("No default NPM registry server found in npm config files. Make sure you have .npmrc files with explicit registry settings accessible");
-    }
-
-    return {
-      registries: Object.assign(profileConfig.registries, projectConfig.registries),
-      tokens: Object.assign(profileConfig.tokens, projectConfig.tokens),
-      other: Object.assign(profileConfig.tokens, projectConfig.tokens)
-    };
   }
 
 
@@ -394,6 +324,11 @@ export class LocalNpmServer {
       cwd: installTo.path,
       env: npmEnv
     });
+
+    if (installTo.lockfileEnabled) {
+      const lockfile = new Lockfile(path.join(installTo.path, "package-lock.json"));
+      lockfile.update();
+    }
 
     await utils.runCommand(utils.getNpmExecutable(), [ "prune" ], {
       cwd: installTo.path,
@@ -449,7 +384,6 @@ export class LocalNpmServer {
     ServiceLocator.instance.initialize("server", server);
   }
 }
-
 
 
 export function getServer() {
