@@ -53,7 +53,6 @@ export class NpmRC {
       let npmrcText = "";
       try {
         npmrcText = fs.readFileSync(filename, { encoding: "utf-8" });
-        console.log(`Loaded npm config from ${ filename }`);
       } catch (error) {
         if (error.code !== "ENOENT") {
           console.log(chalk.red(`Failed to load npm config file ${ filename }: ${ error.message }`));

@@ -65,7 +65,6 @@ export class LocalNpmServer {
     return new Promise<void>((resolve, reject) => {
       this.server = this.app.listen(0, () => {
         this.port = (this.server!.address() as AddressInfo).port;
-        console.log(`Local npm server listening on ${ this.port }`);
         resolve();
       });
     });
