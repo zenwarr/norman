@@ -39,18 +39,6 @@ export class ModuleStateManager extends ModuleOperator {
   }
 
 
-  public getStateHash(state: ModuleState): string {
-    let parts: string[] = [ state.module ];
-
-    for (let filename of Object.keys(state.files)) {
-      parts.push(filename);
-      parts.push("" + state.files[filename]);
-    }
-
-    return crypto.createHash("sha256").update(parts.join(":")).digest("hex");
-  }
-
-
   public async loadSavedState(stateTag: string): Promise<ModuleState | null> {
     let stateFilePath = this.pathToStateFile();
 

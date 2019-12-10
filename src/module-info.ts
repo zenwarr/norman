@@ -217,11 +217,6 @@ export class ModuleInfo {
   }
 
 
-  public createStateManager(): ModuleStateManager {
-    return new ModuleStateManager(this);
-  }
-
-
   public async install(): Promise<void> {
     if (fs.existsSync(path.join(this.path, "node_modules")) || !this.needsNpmInstall) {
       return;
@@ -235,7 +230,7 @@ export class ModuleInfo {
 
 
   public async buildModuleIfChanged(): Promise<boolean> {
-    let stateManager = this.createStateManager();
+    let stateManager = new ModuleStateManager(this);
     if (await stateManager.needsRebuild(BUILD_TAG)) {
       await this.buildModule();
       await stateManager.saveActualState(BUILD_TAG);
@@ -350,7 +345,7 @@ export class ModuleInfo {
   private getDirectLocalDependencies(includeDev: boolean): ModuleInfo[] {
     const config = getConfig();
 
-    let dependentPackages = utils.getPackageDeps(this.path, includeDev);
+    let dependentPackages = utils.getDirectDeps(this.path, includeDev);
     return dependentPackages.map(pkg => config.getModuleInfo(pkg)).filter(dep => !!dep) as ModuleInfo[];
   }
 

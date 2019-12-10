@@ -1,5 +1,5 @@
 import { getConfig } from "./config";
-import { walkDependencyTree } from "./dependency-tree";
+import { walkDryLocalTree } from "./dry-dependency-tree";
 
 
 export async function fetchModules() {
@@ -16,9 +16,7 @@ export async function fetchModules() {
 
 
 export async function installModules() {
-  const config = getConfig();
-
-  await walkDependencyTree(config.modules, async module => {
+  await walkDryLocalTree(async module => {
     await module.install();
   });
 }

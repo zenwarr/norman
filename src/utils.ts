@@ -105,7 +105,7 @@ export async function cleanNpmCache(): Promise<void> {
 }
 
 
-export function getPackageDeps(packagePath: string, includeDev: boolean = true): string[] {
+export function getDirectDeps(packagePath: string, includeDev: boolean = true): string[] {
   let pkgPath = path.join(packagePath, "package.json");
   let pkg = fs.readJSONSync(pkgPath, { encoding: "utf-8" });
   let deps = Object.keys(pkg.dependencies || {});
@@ -123,7 +123,7 @@ export function isPackageInstalled(into: string, pkg: string): boolean {
 
 
 export function getFirstMissingDependency(packagePath: string, includeDev: boolean = true): string | null {
-  let deps = getPackageDeps(packagePath, includeDev);
+  let deps = getDirectDeps(packagePath, includeDev);
 
   for (let dep of deps) {
     if (!isPackageInstalled(packagePath, dep)) {

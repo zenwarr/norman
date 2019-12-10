@@ -5,8 +5,7 @@ import { ModuleOperator } from "./base";
 import * as os from "os";
 import * as ssri from "ssri";
 import { getArgs } from "./arguments";
-import { getConfig } from "./config";
-import { walkDependencyTree, WalkerAction } from "./dependency-tree";
+import { walkDryLocalTree, WalkerAction } from "./dry-dependency-tree";
 
 
 const TEMP_DIR = path.join(os.tmpdir(), "norman");
@@ -128,7 +127,7 @@ export class ModulePackager extends ModuleOperator {
 
 
   public static async prepackLocalModules() {
-    await walkDependencyTree(getConfig().modules, async module => {
+    await walkDryLocalTree(async module => {
       const packager = new ModulePackager(module);
       if (packager.hasActualTarball()) {
         return WalkerAction.Continue;

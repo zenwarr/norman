@@ -4,7 +4,7 @@ import * as utils from "./utils";
 import * as chalk from "chalk";
 import { ModuleOperator } from "./base";
 import { ModuleInfo } from "./module-info";
-import { walkDependencyTree, WalkerAction } from "./dependency-tree";
+import { walkDryLocalTreeSubset, WalkerAction } from "./dry-dependency-tree";
 import { Lockfile } from "./lockfile";
 import { ModuleNpmRunner } from "./module-npm-runner";
 
@@ -25,7 +25,7 @@ export class ModuleSynchronizer extends ModuleOperator {
     let localDependencies = this.module.getLocalDependencies(true);
 
     if (rebuildDeps) {
-      await walkDependencyTree(localDependencies, async module => {
+      await walkDryLocalTreeSubset(localDependencies, async module => {
         await module.buildModuleIfChanged();
       });
     }
@@ -35,7 +35,7 @@ export class ModuleSynchronizer extends ModuleOperator {
     if (!fs.existsSync(path.join(this.module.path, "node_modules"))) {
       runInstall = true;
     } else {
-      await walkDependencyTree(localDependencies, async module => {
+      await walkDryLocalTreeSubset(localDependencies, async module => {
         let installedDepPath = path.join(this.module.path, "node_modules", module.name);
 
         // check if the dependency is installed into node_modules of the current module
@@ -46,8 +46,8 @@ export class ModuleSynchronizer extends ModuleOperator {
         }
 
         // get deps of the installed local module
-        let installedSubDeps = utils.getPackageDeps(installedDepPath, true).sort();
-        let actualSubDeps = utils.getPackageDeps(module.path, true).sort();
+        let installedSubDeps = utils.getDirectDeps(installedDepPath, true).sort();
+        let actualSubDeps = utils.getDirectDeps(module.path, true).sort();
 
         let depsEqual = installedSubDeps.length === actualSubDeps.length && installedSubDeps.every((dep, q) => dep === actualSubDeps[q]);
         if (depsEqual) {

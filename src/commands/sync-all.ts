@@ -2,15 +2,13 @@ import { getServer, LocalNpmServer } from "../server";
 import { ModuleSynchronizer } from "../module-synchronizer";
 import * as chalk from "chalk";
 import { getArgs } from "../arguments";
-import { getConfig } from "../config";
-import { walkDependencyTree } from "../dependency-tree";
+import { walkDryLocalTree } from "../dry-dependency-tree";
 import { fetchModules, installModules } from "../fetcher";
 import { ModulePackager } from "../module-packager";
 
 
 export async function syncAllCommand() {
   let args = getArgs();
-  let config = getConfig();
 
   if (args.subCommand !== "sync-all") {
     return;
@@ -25,7 +23,7 @@ export async function syncAllCommand() {
     await fetchModules();
     await installModules();
 
-    await walkDependencyTree(config.modules, async localModule => {
+    await walkDryLocalTree(async localModule => {
       if (localModule.needsNpmInstall) {
         let synchronizer = new ModuleSynchronizer(localModule);
         await synchronizer.sync(buildDeps);

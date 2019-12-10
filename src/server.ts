@@ -21,12 +21,6 @@ const accept = require("accept");
 const TARBALL_CACHE_DIR = path.join(os.tmpdir(), "norman-cache");
 
 
-export interface ModuleInfoWithDeps {
-  module: ModuleInfo;
-  dependencies: ModuleInfo[];
-}
-
-
 export class LocalNpmServer {
   protected app: express.Application;
   protected port?: number;

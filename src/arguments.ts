@@ -129,7 +129,9 @@ export class ArgumentsManager {
     }
   }
 
+
   private readonly _args: Arguments;
+
 
   public static init() {
     const parser = new ArgumentsManager();
