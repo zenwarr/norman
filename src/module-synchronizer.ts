@@ -61,14 +61,6 @@ export class ModuleSynchronizer extends ModuleOperator {
 
         return WalkerAction.Continue;
       });
-
-      if (!runInstall) {
-        let firstMissing = utils.getFirstMissingDependency(this.module.path);
-        if (firstMissing != null) {
-          console.log(`Reinstalling dependencies because module "${ firstMissing }" is not installed`);
-          runInstall = true;
-        }
-      }
     }
 
     if (runInstall) {

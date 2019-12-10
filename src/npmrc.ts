@@ -21,26 +21,32 @@ const NPMRC_FILENAME = ".npmrc";
 export class NpmRC {
   private _npmrc: NpmConfig;
 
+
   public constructor() {
     const config = getConfig();
     this._npmrc = this.load(config.mainConfigDir);
   }
 
+
   public get defaultRegistry() {
     return this._npmrc.registries.default;
   }
+
 
   public getCustomRegistry(namespace: string): string | undefined {
     return this._npmrc.registries[namespace];
   }
 
+
   public getCustomRegistries(): string[] {
     return Object.keys(this._npmrc.registries);
   }
 
+
   public getTokenForHost(host: string): string | undefined {
     return this._npmrc.tokens[host];
   }
+
 
   protected load(dir: string): NpmConfig {
     const loadNpmrc = (filename: string): NpmConfig => {
@@ -103,6 +109,7 @@ export class NpmRC {
       other: Object.assign(profileConfig.tokens, projectConfig.tokens)
     };
   }
+
 
   public static init() {
     ServiceLocator.instance.initialize("npmrc", new NpmRC());
