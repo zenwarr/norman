@@ -45,7 +45,7 @@ export class ModulesFeeder {
       return existingWatcher;
     } else {
       let watcher = new ModuleWatcher(module);
-      watcher.addDepsChangedHandler(this.onDepsChanged.bind(this, module));
+      watcher.addManifestChangeHandler(this.onDepsChanged.bind(this, module));
       await watcher.addSyncTarget(targetModule);
       await watcher.watch();
       this._pool[module.name] = watcher;
@@ -261,7 +261,7 @@ export class ModuleWatcher extends ModuleOperator {
     let targetFilePath = path.join(targetModulePath, relpath);
 
     if (relpath === "package.json") {
-      this.onDepsChanged();
+      this.onManifestChanged();
       return [];
     }
 
@@ -270,13 +270,13 @@ export class ModuleWatcher extends ModuleOperator {
   }
 
 
-  protected onDepsChanged(): void {
-    this._eventEmitter.emit("depsChanged");
+  protected onManifestChanged(): void {
+    this._eventEmitter.emit("manifestChanged");
   }
 
 
-  public addDepsChangedHandler(handler: () => void): void {
-    this._eventEmitter.addListener("depsChanged", handler);
+  public addManifestChangeHandler(handler: () => void): void {
+    this._eventEmitter.addListener("manifestChanged", handler);
   }
 
 
