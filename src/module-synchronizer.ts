@@ -5,7 +5,8 @@ import * as chalk from "chalk";
 import { ModuleOperator } from "./base";
 import { ModuleInfo } from "./module-info";
 import { getServer } from "./server";
-import { walkDependencyTree } from "./dependency-tree";
+import { walkDependencyTree, WalkerAction } from "./dependency-tree";
+import { Lockfile } from "./lockfile";
 
 
 export class ModuleSynchronizer extends ModuleOperator {
@@ -37,12 +38,13 @@ export class ModuleSynchronizer extends ModuleOperator {
       runInstall = true;
     } else {
       await walkDependencyTree(localDependencies, async module => {
-        // check if the dependency is installed into node_modules of the current module
         let installedDepPath = path.join(this.module.path, "node_modules", module.name);
+
+        // check if the dependency is installed into node_modules of the current module
         if (!fs.existsSync(installedDepPath)) {
-          console.log(`Reinstalling dependencies because module ${ module.name } is not installed`);
+          console.log(`Reinstalling dependencies because module "${ module.name }" is not installed`);
           runInstall = true;
-          return;
+          return WalkerAction.Stop;
         }
 
         // get deps of the installed local module
@@ -53,20 +55,30 @@ export class ModuleSynchronizer extends ModuleOperator {
         if (depsEqual) {
           await (new ModuleSynchronizer(module)).quickSyncTo(this.module);
         } else {
-          console.log(`Reinstalling dependencies because module ${ module.name } dependencies have changed`);
+          console.log(`Reinstalling dependencies because dependencies of module "${ module.name }" have changed`);
           fs.removeSync(installedDepPath);
           runInstall = true;
+          return WalkerAction.Stop;
         }
+
+        return WalkerAction.Continue;
       });
 
-      let firstMissing = utils.getFirstMissingDependency(this.module.path);
-      if (firstMissing != null) {
-        console.log(`Reinstalling dependencies because module ${ firstMissing } is not installed`);
-        runInstall = true;
+      if (!runInstall) {
+        let firstMissing = utils.getFirstMissingDependency(this.module.path);
+        if (firstMissing != null) {
+          console.log(`Reinstalling dependencies because module "${ firstMissing }" is not installed`);
+          runInstall = true;
+        }
       }
     }
 
     if (runInstall) {
+      if (this.module.lockfileEnabled) {
+        const lockfile = new Lockfile(path.join(this.module.path, "package-lock.json"));
+        lockfile.updateIntegrity();
+      }
+
       await server.installModuleDeps(this.module);
     }
   }

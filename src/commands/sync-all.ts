@@ -5,6 +5,7 @@ import { getArgs } from "../arguments";
 import { getConfig } from "../config";
 import { walkDependencyTree } from "../dependency-tree";
 import { fetchModules, installModules } from "../fetcher";
+import { ModulePackager } from "../module-packager";
 
 
 export async function syncAllCommand() {
@@ -18,6 +19,7 @@ export async function syncAllCommand() {
   let buildDeps = args.buildDeps;
 
   await LocalNpmServer.init();
+  await ModulePackager.prepackLocalModules();
 
   try {
     await fetchModules();

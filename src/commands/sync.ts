@@ -5,6 +5,7 @@ import { ModulesFeeder } from "../module-watcher";
 import { ModuleSynchronizer } from "../module-synchronizer";
 import { getArgs } from "../arguments";
 import { getConfig } from "../config";
+import { ModulePackager } from "../module-packager";
 
 
 export async function syncCommand() {
@@ -22,6 +23,7 @@ export async function syncCommand() {
   }
 
   await LocalNpmServer.init();
+  await ModulePackager.prepackLocalModules();
 
   try {
     let argPath = args.path;

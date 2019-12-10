@@ -233,11 +233,6 @@ export class ModuleInfo {
   }
 
 
-  public createPackager(): ModulePackager {
-    return new ModulePackager(this);
-  }
-
-
   public async install(): Promise<void> {
     if (fs.existsSync(path.join(this.path, "node_modules")) || !this.needsNpmInstall) {
       return;

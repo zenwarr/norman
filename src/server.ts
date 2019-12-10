@@ -17,6 +17,7 @@ import { getConfig } from "./config";
 import { ServiceLocator } from "./locator";
 import { getNpmRc } from "./npmrc";
 import { Lockfile } from "./lockfile";
+import { ModulePackager } from "./module-packager";
 
 
 const accept = require("accept");
@@ -225,24 +226,8 @@ export class LocalNpmServer {
     let localModule = config.modules.find(module => module.name === packageName);
     if (localModule) {
       try {
-        let stateManager = localModule.createStateManager();
-        let actualState = await stateManager.loadActualState();
-        let stateHash = stateManager.getStateHash(actualState);
-
-        let archivePath: string;
-
-        let packagedDirPath = path.join(TEMP_DIR, `${ packageName }-${ stateHash }`);
-
-        let packager = localModule.createPackager();
-        if (fs.existsSync(packagedDirPath)) {
-          archivePath = packager.getArchivePathFromDir(packagedDirPath);
-        } else {
-          archivePath = await packager.pack(stateHash);
-
-          await stateManager.saveActualState(PACK_TAG);
-        }
-
-        res.sendFile(archivePath);
+        let packager = new ModulePackager(localModule);
+        res.sendFile(await packager.getActualTarballPath());
       } catch (error) {
         console.error(error);
       }

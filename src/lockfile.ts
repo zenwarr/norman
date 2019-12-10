@@ -1,5 +1,7 @@
 import * as fs from "fs-extra";
 import { resolveRegistryUrl } from "./registry-paths";
+import { getConfig } from "./config";
+import { ModulePackager } from "./module-packager";
 
 
 export type DependencyMap = { [name: string]: LockfileDependency };
@@ -29,9 +31,35 @@ export class Lockfile {
     return this._filename;
   }
 
+
   public constructor(private _filename: string) {
 
   }
+
+
+  public update() {
+    this.mutateDependencies(dep => {
+      if (dep.resolved) {
+        dep.resolved = resolveRegistryUrl(dep.resolved, dep.version);
+      }
+    });
+  }
+
+
+  public updateIntegrity() {
+    const config = getConfig();
+
+    this.mutateDependencies((dep, name) => {
+      const localModule = config.getModuleInfo(name);
+      if (!localModule) {
+        return;
+      }
+
+      const packager = new ModulePackager(localModule);
+      dep.integrity = packager.getActualTarballIntegrity();
+    });
+  }
+
 
   private load(): LockfileContent {
     const content: any = fs.readJSONSync(this._filename);
@@ -50,17 +78,11 @@ export class Lockfile {
     return content;
   }
 
+
   private validationErrorText(text: string) {
     return `Lockfile "${ this.filename }" is invalid: ${ text }`;
   }
 
-  public update() {
-    this.mutateDependencies(dep => {
-      if (dep.resolved) {
-        dep.resolved = resolveRegistryUrl(dep.resolved, dep.version);
-      }
-    });
-  }
 
   private mutateDependencies(walker: DependencyWalker): void {
     const content = this.load();
@@ -71,6 +93,7 @@ export class Lockfile {
       spaces: 2
     });
   }
+
 
   private _walkDependencies(parentPath: string, deps: DependencyMap, walker: DependencyWalker) {
     for (const depName of Object.keys(deps)) {

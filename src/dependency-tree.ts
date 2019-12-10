@@ -4,6 +4,15 @@ import * as utils from "./utils";
 import { getConfig } from "./config";
 
 
+export enum WalkerAction {
+  Continue,
+  Stop
+}
+
+
+export type ModuleWalker = (module: ModuleInfo) => Promise<WalkerAction | void>;
+
+
 export function getDependencyTree(modules: ModuleInfo[]): ModuleInfoWithDeps[] {
   const config = getConfig();
 
@@ -18,7 +27,7 @@ export function getDependencyTree(modules: ModuleInfo[]): ModuleInfoWithDeps[] {
 }
 
 
-export async function walkDependencyTree(modules: ModuleInfo[], walker: (module: ModuleInfo) => Promise<void>): Promise<void> {
+export async function walkDependencyTree(modules: ModuleInfo[], walker: ModuleWalker): Promise<void> {
   let tree = getDependencyTree(modules);
 
   const walkedModules: string[] = [];
@@ -33,9 +42,9 @@ export async function walkDependencyTree(modules: ModuleInfo[], walker: (module:
     return walkedModules.indexOf(module.name) >= 0;
   };
 
-  const walkModule = async(module: ModuleInfoWithDeps, parents: string[]) => {
+  const walkModule = async(module: ModuleInfoWithDeps, parents: string[]): Promise<WalkerAction> => {
     if (isAlreadyWalked(module.module)) {
-      return;
+      return WalkerAction.Continue;
     }
 
     for (let dep of module.dependencies) {
@@ -46,16 +55,24 @@ export async function walkDependencyTree(modules: ModuleInfo[], walker: (module:
 
       let depWithDeps = tree.find(mod => mod.module.name === dep.name);
       if (depWithDeps) {
-        await walkModule(depWithDeps, parents.concat([ module.module.name ]));
+        const subAction = await walkModule(depWithDeps, parents.concat([ module.module.name ]));
+        if (subAction === WalkerAction.Stop) {
+          return WalkerAction.Stop;
+        }
       }
     }
 
-    await walker(module.module);
+    const action = await walker(module.module) || WalkerAction.Continue;
 
     markWalked(module.module);
+
+    return action;
   };
 
   for (let module of tree) {
-    await walkModule(module, []);
+    const action = await walkModule(module, []);
+    if (action === WalkerAction.Stop) {
+      return;
+    }
   }
 }

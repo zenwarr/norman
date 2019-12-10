@@ -18,8 +18,6 @@ export async function updateLockfileCommand() {
         });
       }
 
-      console.log(`updating lockfile at ${lockfilePath}`);
-
       const lockfile = new Lockfile(lockfilePath);
       lockfile.update();
     }
