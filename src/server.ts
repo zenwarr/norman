@@ -5,25 +5,19 @@ import * as os from "os";
 import * as http from "http";
 import * as path from "path";
 import * as url from "url";
-import * as ini from "ini";
-import * as utils from "./utils";
-import * as chalk from "chalk";
 import * as contentType from "content-type";
 import * as crypto from "crypto";
 import { ModuleInfo } from "./module-info";
-import { PACK_TAG } from "./module-state-manager";
 import { AddressInfo } from "net";
 import { getConfig } from "./config";
 import { ServiceLocator } from "./locator";
 import { getNpmRc } from "./npmrc";
-import { Lockfile } from "./lockfile";
 import { ModulePackager } from "./module-packager";
 
 
 const accept = require("accept");
 
 
-const TEMP_DIR = path.join(os.tmpdir(), "norman");
 const TARBALL_CACHE_DIR = path.join(os.tmpdir(), "norman-cache");
 
 
@@ -64,7 +58,7 @@ export class LocalNpmServer {
   }
 
 
-  public get myServerAddress() {
+  public get address() {
     if (this.port == null) {
       throw new Error("Cannot get npm server address: server not started yet");
     } else {
@@ -137,7 +131,7 @@ export class LocalNpmServer {
           for (let version of Object.keys(json.versions || {})) {
             let versionObject = json.versions[version];
             if (versionObject.dist && versionObject.dist.tarball) {
-              versionObject.dist.tarball = `${ this.myServerAddress }/tarballs/${ encodeURIComponent(packageName) }?url=${ encodeURIComponent(versionObject.dist.tarball) }&norman=remote`;
+              versionObject.dist.tarball = `${ this.address }/tarballs/${ encodeURIComponent(packageName) }?url=${ encodeURIComponent(versionObject.dist.tarball) }&norman=remote`;
             }
           }
 
@@ -197,7 +191,7 @@ export class LocalNpmServer {
       directories: {},
       _hasShrinkwrap: false,
       dist: {
-        tarball: `${ this.myServerAddress }/tarballs/${ module.name }?norman=local&name=${ encodeURIComponent(module.name) }`
+        tarball: `${ this.address }/tarballs/${ module.name }?norman=local&name=${ encodeURIComponent(module.name) }`
       }
     };
 
@@ -281,80 +275,6 @@ export class LocalNpmServer {
   protected cacheTarball(tarballUrl: string, data: Buffer): void {
     fs.mkdirpSync(TARBALL_CACHE_DIR);
     fs.writeFileSync(this.pathForCachedTarball(tarballUrl), data);
-  }
-
-
-  public buildNpmEnv(module: ModuleInfo): NodeJS.ProcessEnv {
-    let result = process.env;
-
-    for (let key of getNpmRc().getCustomRegistries()) {
-      if (key !== "default") {
-        result[`npm_config_${ key }:registry`] = this.myServerAddress;
-      }
-    }
-
-    result.npm_config_registry = this.myServerAddress;
-    result["npm_config_package-lock"] = module.lockfileEnabled ? "true" : "false";
-
-    return result;
-  }
-
-
-  public async installModuleDeps(installTo: ModuleInfo): Promise<void> {
-    await utils.cleanNpmCache();
-
-    let npmEnv = this.buildNpmEnv(installTo);
-
-    await utils.runCommand(utils.getNpmExecutable(), [ "install" ], {
-      cwd: installTo.path,
-      env: npmEnv
-    });
-
-    if (installTo.lockfileEnabled) {
-      const lockfile = new Lockfile(path.join(installTo.path, "package-lock.json"));
-      lockfile.update();
-    }
-
-    await utils.runCommand(utils.getNpmExecutable(), [ "prune" ], {
-      cwd: installTo.path,
-      env: npmEnv
-    });
-
-    await utils.cleanNpmCache();
-  }
-
-
-  public async getOutdated(mod: ModuleInfo): Promise<any> {
-    let result = await utils.runCommand(utils.getNpmExecutable(), [ "outdated", "--json" ], {
-      cwd: mod.path,
-      env: this.buildNpmEnv(mod),
-      ignoreExitCode: true,
-      collectOutput: true,
-      silent: true
-    });
-
-    result = result ? result.trim() : result;
-    if (result) {
-      let resultObj = JSON.parse(result);
-
-      for (let dep of Object.keys(resultObj)) {
-        let depData = resultObj[dep];
-        if (depData.current === "linked") {
-          delete resultObj[dep];
-        }
-      }
-
-      return resultObj;
-    }
-    return {};
-  }
-
-
-  public async upgradeDependency(mod: ModuleInfo, pkg: string, version: string): Promise<void> {
-    await utils.runCommand(utils.getNpmExecutable(), [ "install", `${ pkg }@${ version }` ], {
-      cwd: mod.path,
-      env: this.buildNpmEnv(mod)
-    });
   }
 
 

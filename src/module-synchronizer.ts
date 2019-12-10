@@ -4,9 +4,9 @@ import * as utils from "./utils";
 import * as chalk from "chalk";
 import { ModuleOperator } from "./base";
 import { ModuleInfo } from "./module-info";
-import { getServer } from "./server";
 import { walkDependencyTree, WalkerAction } from "./dependency-tree";
 import { Lockfile } from "./lockfile";
+import { ModuleNpmRunner } from "./module-npm-runner";
 
 
 export class ModuleSynchronizer extends ModuleOperator {
@@ -22,8 +22,6 @@ export class ModuleSynchronizer extends ModuleOperator {
    * -       If dependencies do not match, remove the installed module from `node_modules` of the current module and run `npm install`.
    */
   public async sync(rebuildDeps: boolean): Promise<void> {
-    const server = getServer();
-
     let localDependencies = this.module.getLocalDependencies(true);
 
     if (rebuildDeps) {
@@ -74,12 +72,13 @@ export class ModuleSynchronizer extends ModuleOperator {
     }
 
     if (runInstall) {
-      if (this.module.lockfileEnabled) {
-        const lockfile = new Lockfile(path.join(this.module.path, "package-lock.json"));
+      if (this.module.hasLockFile()) {
+        const lockfile = Lockfile.forModule(this.module);
         lockfile.updateIntegrity();
       }
 
-      await server.installModuleDeps(this.module);
+      const runner = new ModuleNpmRunner(this.module);
+      await runner.install();
     }
   }
 

@@ -5,9 +5,9 @@ import gitUrlParse = require("git-url-parse");
 import * as utils from "./utils";
 import { BUILD_TAG, ModuleStateManager } from "./module-state-manager";
 import ignore from "ignore";
-import { ModulePackager } from "./module-packager";
-import { getServer } from "./server";
 import { getPluginManager } from "./plugins";
+import { Lockfile } from "./lockfile";
+import { ModuleNpmRunner } from "./module-npm-runner";
 
 
 interface RawModuleConfig {
@@ -21,7 +21,6 @@ interface RawModuleConfig {
   buildCommands?: unknown;
   npmInstall?: unknown;
   buildTriggers?: unknown;
-  lockfileEnabled?: unknown;
 }
 
 export interface ModuleNpmName {
@@ -41,7 +40,6 @@ export interface ModuleInfoInit {
   npmInstall: boolean;
   isMain: boolean;
   buildTriggers: string[];
-  lockfileEnabled: boolean;
 }
 
 export const IGNORE_REGEXPS = [
@@ -75,8 +73,8 @@ export class ModuleInfo {
     return this._config.buildTriggers;
   }
 
-  public get lockfileEnabled(): boolean {
-    return this._config.lockfileEnabled;
+  public hasLockFile(): boolean {
+    return Lockfile.existsInDir(this.path);
   }
 
 
@@ -174,14 +172,6 @@ export class ModuleInfo {
       buildTriggers = rawConfig.buildTriggers;
     }
 
-    let lockfileEnabled: boolean = appConfig.defaultLockfileEnabled;
-    if ("lockfileEnabled" in rawConfig) {
-      if (typeof rawConfig.lockfileEnabled !== "boolean") {
-        throw new Error("'lockfileEnabled' should be a boolean");
-      }
-      lockfileEnabled = rawConfig.lockfileEnabled;
-    }
-
     return new ModuleInfo({
       repository,
       npmName,
@@ -192,8 +182,7 @@ export class ModuleInfo {
       npmIgnorePath,
       npmInstall,
       isMain,
-      buildTriggers,
-      lockfileEnabled
+      buildTriggers
     });
   }
 
@@ -238,7 +227,8 @@ export class ModuleInfo {
       return;
     }
 
-    await getServer().installModuleDeps(this);
+    const runner = new ModuleNpmRunner(this);
+    await runner.install();
 
     await this.buildModuleIfChanged();
   }

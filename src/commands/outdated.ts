@@ -2,6 +2,7 @@ import { getServer, LocalNpmServer } from "../server";
 import * as chalk from "chalk";
 import { getArgs } from "../arguments";
 import { getConfig } from "../config";
+import { ModuleUpgrader } from "../module-upgrader";
 
 
 export async function outdatedCommand() {
@@ -23,7 +24,8 @@ export async function outdatedCommand() {
       console.log(`[${ index }/${ modsToAnalyze.length }] Analyzing dependencies of "${ mod.name }"...`);
       ++index;
 
-      let result = await getServer().getOutdated(mod);
+      let upgrader = new ModuleUpgrader(mod);
+      let result = await upgrader.getOutdated();
       if (Object.keys(result).length) {
         results[mod.name] = result;
       }
@@ -80,7 +82,6 @@ function buildOutdatedReport(outdatedData: any): string {
 
 async function upgradeModules(outdatedData: any, hard: boolean): Promise<void> {
   const config = getConfig();
-  const server = getServer();
 
   for (let mod of config.modules) {
     let modData = outdatedData[mod.name];
@@ -97,7 +98,8 @@ async function upgradeModules(outdatedData: any, hard: boolean): Promise<void> {
 
       console.log(`Upgrading dependencies of "${ mod.name }": "${ dep }@${ depData.current }" -> "${ dep }@${ installVersion }"`);
       try {
-        await server.upgradeDependency(mod, dep, installVersion);
+        const upgrader = new ModuleUpgrader(mod);
+        await upgrader.upgradeDependency(dep, installVersion);
       } catch (error) {
         console.error(chalk.red(`Failed to upgrade dependency of "${ mod.name }": "${ dep }" to version ${ installVersion }`));
       }

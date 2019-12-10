@@ -18,7 +18,6 @@ interface RawConfig {
   defaultBranch?: unknown;
   defaultNpmInstall?: unknown;
   defaultBuildTriggers?: unknown;
-  defaultLockfileEnabled?: unknown;
 }
 
 
@@ -30,7 +29,6 @@ interface ConfigInit {
   defaultBranch: string;
   defaultNpmInstall: boolean;
   defaultBuildTriggers: string[];
-  defaultLockfileEnabled: boolean;
 }
 
 
@@ -68,11 +66,6 @@ export class Config {
   public get modules(): ModuleInfo[] {
     return this._modules;
   }
-
-  public get defaultLockfileEnabled(): boolean {
-    return this._config.defaultLockfileEnabled;
-  }
-
 
   protected constructor(private _config: ConfigInit) {
 
@@ -141,14 +134,6 @@ export class Config {
       defaultBuildDeps = rawConfig.defaultBuildTriggers;
     }
 
-    let defaultLockfileEnabled = false;
-    if ("defaultLockfileEnabled" in rawConfig) {
-      if (typeof rawConfig.defaultLockfileEnabled !== "boolean") {
-        throw new Error("'defaultLockfileEnabled' should be a boolean");
-      }
-      defaultLockfileEnabled = rawConfig.defaultLockfileEnabled;
-    }
-
     let appConfig = new Config({
       mainConfigDir,
       mainModulesDir,
@@ -156,8 +141,7 @@ export class Config {
       defaultNpmIgnorePath,
       defaultBranch,
       defaultNpmInstall,
-      defaultBuildTriggers: defaultBuildDeps,
-      defaultLockfileEnabled
+      defaultBuildTriggers: defaultBuildDeps
     });
 
     appConfig._modules = this.loadModules(configFilename, rawConfig, appConfig, isMainConfig, ignoreMissing);

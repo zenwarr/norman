@@ -1,7 +1,12 @@
 import * as fs from "fs-extra";
+import * as path from "path";
 import { resolveRegistryUrl } from "./registry-paths";
 import { getConfig } from "./config";
 import { ModulePackager } from "./module-packager";
+import { ModuleInfo } from "./module-info";
+
+
+const LOCKFILE_NAME = "package-lock.json";
 
 
 export type DependencyMap = { [name: string]: LockfileDependency };
@@ -37,7 +42,22 @@ export class Lockfile {
   }
 
 
-  public update() {
+  public static getPathForDir(dir: string): string {
+    return path.join(dir, LOCKFILE_NAME);
+  }
+
+
+  public static forModule(module: ModuleInfo) {
+    return new Lockfile(this.getPathForDir(module.path));
+  }
+
+
+  public static existsInDir(dir: string) {
+    return fs.existsSync(this.getPathForDir(dir));
+  }
+
+
+  public updateResolveUrl() {
     this.mutateDependencies(dep => {
       if (dep.resolved) {
         dep.resolved = resolveRegistryUrl(dep.resolved, dep.version);
