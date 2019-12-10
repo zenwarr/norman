@@ -240,7 +240,9 @@ export class LocalNpmServer {
           encoding: null
         });
 
-        this.cacheTarball(req.query.url, response.body);
+        if (response.statusCode === 200) {
+          this.cacheTarball(req.query.url, response.body);
+        }
 
         res.status(response.statusCode).set(response.headers).send(response.body);
       } catch (error) {
