@@ -119,8 +119,6 @@ export class ArgumentsManager {
       dest: "withIncluded"
     });
 
-    subparsers.addParser("lockfile", { help: "Updates lockfiles" });
-
     let args: Arguments = argparser.parseArgs();
     this._args = args;
 

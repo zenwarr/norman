@@ -10,7 +10,6 @@ import { outdatedCommand } from "./commands/outdated";
 import { ArgumentsManager, getArgs } from "./arguments";
 import { PluginManager } from "./plugins";
 import { NpmRC } from "./npmrc";
-import { updateLockfileCommand } from "./commands/lockfile";
 
 
 async function asyncStart(): Promise<void> {
@@ -28,8 +27,7 @@ async function asyncStart(): Promise<void> {
     sync: syncCommand,
     clean: cleanCommand,
     "sync-all": syncAllCommand,
-    outdated: outdatedCommand,
-    lockfile: updateLockfileCommand
+    outdated: outdatedCommand
   };
 
   const command = COMMANDS[args.subCommand];
