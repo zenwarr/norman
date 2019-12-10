@@ -64,11 +64,6 @@ export class ModuleSynchronizer extends ModuleOperator {
     }
 
     if (runInstall) {
-      if (this.module.hasLockFile()) {
-        const lockfile = Lockfile.forModule(this.module);
-        lockfile.updateIntegrity();
-      }
-
       const runner = new ModuleNpmRunner(this.module);
       await runner.install();
     }

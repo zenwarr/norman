@@ -9,10 +9,15 @@ export class ModuleNpmRunner extends ModuleOperator {
   public async install(): Promise<void> {
     await utils.cleanNpmCache();
 
+    let lockfile: Lockfile | undefined;
+    if (this.module.hasLockFile()) {
+      lockfile = Lockfile.forModule(this.module);
+      lockfile.updateIntegrity();
+    }
+
     await this.run("install");
 
-    if (this.module.hasLockFile()) {
-      const lockfile = Lockfile.forModule(this.module);
+    if (lockfile) {
       lockfile.updateResolveUrl();
     }
 
