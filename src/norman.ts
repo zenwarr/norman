@@ -10,6 +10,7 @@ import { outdatedCommand } from "./commands/outdated";
 import { ArgumentsManager, getArgs } from "./arguments";
 import { PluginManager } from "./plugins";
 import { NpmRC } from "./npmrc";
+import { ModuleStateManager } from "./module-state-manager";
 
 
 async function asyncStart(): Promise<void> {
@@ -17,6 +18,7 @@ async function asyncStart(): Promise<void> {
   Config.init();
   NpmRC.init();
   PluginManager.init();
+  ModuleStateManager.init();
 
   let args = getArgs();
 

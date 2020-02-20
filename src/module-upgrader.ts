@@ -1,9 +1,10 @@
-import { ModuleNpmRunner } from "./module-npm-runner";
+import { ModuleInfo } from "./module-info";
+import { NpmRunner } from "./module-npm-runner";
 
 
-export class ModuleUpgrader extends ModuleNpmRunner {
-  public async getOutdated(): Promise<any> {
-    let result = await this.run([ "outdated", "--json" ], {
+export namespace ModuleUpgrade {
+  export async function getOutdated(module: ModuleInfo): Promise<any> {
+    let result = await NpmRunner.run(module, [ "outdated", "--json" ], {
       ignoreExitCode: true,
       collectOutput: true,
       silent: true
@@ -26,7 +27,7 @@ export class ModuleUpgrader extends ModuleNpmRunner {
   }
 
 
-  public async upgradeDependency(pkg: string, version: string): Promise<void> {
-    await this.run([ "install", `${ pkg }@${ version }` ]);
+  export async function upgradeDependency(module: ModuleInfo, pkg: string, version: string): Promise<void> {
+    await NpmRunner.run(module, [ "install", `${ pkg }@${ version }` ]);
   }
 }

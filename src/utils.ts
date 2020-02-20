@@ -112,6 +112,7 @@ export function getDirectDeps(packagePath: string, includeDev: boolean = true): 
   if (includeDev) {
     deps = deps.concat(Object.keys(pkg.devDependencies || {}));
   }
+
   return deps;
 }
 

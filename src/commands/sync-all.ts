@@ -2,9 +2,8 @@ import { getServer, LocalNpmServer } from "../server";
 import { ModuleSynchronizer } from "../module-synchronizer";
 import * as chalk from "chalk";
 import { getArgs } from "../arguments";
-import { walkDryLocalTree } from "../dry-dependency-tree";
-import { fetchModules, installModules } from "../fetcher";
-import { ModulePackager } from "../module-packager";
+import { walkAllLocalModules } from "../dry-dependency-tree";
+import { getConfig } from "../config";
 
 
 export async function syncAllCommand() {
@@ -14,23 +13,15 @@ export async function syncAllCommand() {
     return;
   }
 
-  let buildDeps = args.buildDeps;
+  let shouldBuild = args.buildDeps;
 
   await LocalNpmServer.init();
-  await ModulePackager.prepackLocalModules();
 
   try {
-    await fetchModules();
-    await installModules();
+    await walkAllLocalModules(async module => module.fetch());
+    await walkAllLocalModules(async module => module.installIfDepsNotInitialized());
 
-    await walkDryLocalTree(async localModule => {
-      if (localModule.needsNpmInstall) {
-        let synchronizer = new ModuleSynchronizer(localModule);
-        await synchronizer.sync(buildDeps);
-      } else {
-        console.log(chalk.yellow(`Skipping sync for module ${ localModule.name } because npmInstall for this module is false`));
-      }
-    });
+    await ModuleSynchronizer.syncRoots(getConfig().modules, shouldBuild);
   } finally {
     await getServer().stop();
   }

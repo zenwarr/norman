@@ -1,6 +1,7 @@
 import { getServer, LocalNpmServer } from "../server";
-import { fetchModules, installModules } from "../fetcher";
 import { getArgs } from "../arguments";
+import { getConfig } from "../config";
+import { walkAllLocalModules } from "../dry-dependency-tree";
 
 
 export async function fetchCommand() {
@@ -13,10 +14,16 @@ export async function fetchCommand() {
   await LocalNpmServer.init();
 
   try {
-    await fetchModules();
+    const config = getConfig();
+
+    for (let module of config.modules) {
+      await module.fetch();
+    }
 
     if (!args.noInstall) {
-      await installModules();
+      await walkAllLocalModules(async module => {
+        await module.installIfDepsNotInitialized();
+      });
     }
   } finally {
     await getServer().stop();

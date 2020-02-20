@@ -1,91 +1,71 @@
 import * as fs from "fs-extra";
 import * as path from "path";
 import * as utils from "./utils";
-import { ModuleOperator } from "./base";
 import * as os from "os";
 import * as ssri from "ssri";
-import { getArgs } from "./arguments";
-import { walkDryLocalTree, WalkerAction } from "./dry-dependency-tree";
+import { ModuleInfo } from "./module-info";
+import { PublishDependenciesSubset } from "./publish-dependencies-subset";
+import { ServiceLocator } from "./locator";
 
 
 const TEMP_DIR = path.join(os.tmpdir(), "norman");
 
 
-export class ModulePackager extends ModuleOperator {
-  public getActualIntegrity(): string {
-    const manifestContent = fs.readFileSync(path.join(this.module.path, "package.json"));
-    return ssri.create().update(manifestContent).digest().toString();
+/**
+ * Creates tarball from module directory.
+ * It copies module files into some temp directory and then runs `npm pack` inside to generate tarball.
+ */
+export class ModulePackager {
+  private getVersion(module: ModuleInfo) {
+    const manifestContent = fs.readJSONSync(path.join(module.path, "package.json"));
+    return encodeURIComponent(manifestContent.version || "unknown");
   }
 
 
-  private getActualPackageDir(): string {
-    const integrity = encodeURIComponent(this.getActualIntegrity());
-    return path.join(TEMP_DIR, `${ this.module.name }-${ integrity }`);
+  private getModuleTempDir(module: ModuleInfo): string {
+    return path.join(TEMP_DIR, `${ module.name }-${ this.getVersion(module) }`);
   }
 
 
-  /**
-   * Returns path to a tarball matching actual package.json integrity of this module.
-   */
-  public getActualTarballPath() {
-    const tempPackagePath = this.getActualPackageDir();
+  public getPrepackagedArchivePath(module: ModuleInfo) {
+    const tempDir = this.getModuleTempDir(module);
 
-    if (!fs.existsSync(tempPackagePath)) {
-      throw new Error(`Failed to find prepackaged archive for module "${ this.module.name }", maybe package.json changed after running npm install?`);
+    if (!fs.existsSync(tempDir)) {
+      throw new Error(`Failed to find prepackaged archive for module "${ module.name }", maybe version field in package.json changed after running npm install?`);
     }
 
-    const archivePath = this.getTarballPathFromDir(tempPackagePath);
+    const archivePath = this.getTarballPathFromDir(module, tempDir);
     if (!fs.existsSync(archivePath)) {
-      throw new Error(`Failed find prepackaged archive for module "${ this.module.name }", maybe package name in package.json is wrong?`);
+      throw new Error(`Failed find prepackaged archive for module "${ module.name }", maybe package name in package.json is wrong?`);
     }
 
     return archivePath;
   }
 
 
-  public getActualTarballIntegrity(): string {
-    const tarballPath = this.getActualTarballPath();
+  public getPrepackagedArchiveIntegrity(module: ModuleInfo): string {
+    const tarballPath = this.getPrepackagedArchivePath(module);
     const tarballData = fs.readFileSync(tarballPath);
     return ssri.create().update(tarballData).digest().toString();
   }
 
 
-  public hasActualTarball() {
-    const tempPackagePath = this.getActualPackageDir();
-
-    if (!fs.existsSync(tempPackagePath)) {
-      return false;
-    }
-
-    const archivePath = this.getTarballPathFromDir(tempPackagePath);
-    return fs.existsSync(archivePath);
-  }
-
-
-  private async updateTarball(): Promise<void> {
-    const args = getArgs();
-
-    if (args.subCommand === "sync" && args.buildDeps) {
-      await this.module.buildModuleIfChanged();
-    }
-
+  public async pack(module: ModuleInfo): Promise<void> {
     if (!fs.existsSync(TEMP_DIR)) {
       fs.mkdirpSync(TEMP_DIR);
     }
 
-    let tempDir = this.getActualPackageDir();
+    let tempDir = this.getModuleTempDir(module);
+    await fs.removeSync(tempDir);
 
-    await this.module.walkModuleFiles(async(source, stat) => {
-      let relativeSourceFileName = path.relative(this.module.path, source);
-      if (relativeSourceFileName === ".gitignore" || relativeSourceFileName === ".npmignore") {
+    const subset = new PublishDependenciesSubset();
+
+    await module.walkModuleFiles(async(source, stat) => {
+      if (!subset.isFileIncluded(module, source)) {
         return;
       }
 
-      let target = path.join(tempDir, path.relative(this.module.path, source));
-
-      if (this.module.isIgnoredByRules(source)) {
-        return;
-      }
+      let target = path.join(tempDir, path.relative(module.path, source));
 
       let parentDestDir = path.dirname(target);
       if (!fs.existsSync(parentDestDir)) {
@@ -93,7 +73,7 @@ export class ModulePackager extends ModuleOperator {
       }
 
       if (!stat.isDirectory()) {
-        await this.module.copyFile(source, target);
+        await module.copyFile(source, target);
       } else {
         fs.mkdirpSync(target);
       }
@@ -106,36 +86,31 @@ export class ModulePackager extends ModuleOperator {
   }
 
 
-  private getTarballPathFromDir(outPath: string): string {
-    const manifest = fs.readJSONSync(path.join(outPath, "package.json"));
-    const version = manifest.version;
+  private getTarballPathFromDir(module: ModuleInfo, outPath: string): string {
+    const version = this.getVersion(module);
 
     let archiveName: string;
-    if (this.module.npmName.org) {
-      archiveName = `${ this.module.npmName.org }-${ this.module.npmName.pkg }-${ version }.tgz`;
+    if (module.npmName.org) {
+      archiveName = `${ module.npmName.org }-${ module.npmName.pkg }-${ version }.tgz`;
     } else {
-      archiveName = `${ this.module.npmName.pkg }-${ version }.tgz`;
+      archiveName = `${ module.npmName.pkg }-${ version }.tgz`;
     }
 
     return path.join(outPath, archiveName);
   }
 
 
-  public static cleanTemp(): void {
+  public cleanTemp(): void {
     fs.removeSync(TEMP_DIR);
   }
 
 
-  public static async prepackLocalModules() {
-    await walkDryLocalTree(async module => {
-      const packager = new ModulePackager(module);
-      if (packager.hasActualTarball()) {
-        return WalkerAction.Continue;
-      }
-
-      await packager.updateTarball();
-
-      return WalkerAction.Continue;
-    });
+  public static init() {
+    ServiceLocator.instance.initialize("packager", new ModulePackager());
   }
+}
+
+
+export function getPackager() {
+  return ServiceLocator.instance.get<ModulePackager>("packager");
 }

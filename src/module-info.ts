@@ -3,11 +3,12 @@ import * as path from "path";
 import * as fs from "fs-extra";
 import gitUrlParse = require("git-url-parse");
 import * as utils from "./utils";
-import { BUILD_TAG, ModuleStateManager } from "./module-state-manager";
 import ignore from "ignore";
 import { getPluginManager } from "./plugins";
 import { Lockfile } from "./lockfile";
-import { ModuleNpmRunner } from "./module-npm-runner";
+import { BuildDependenciesSubset } from "./build-dependencies-subset";
+import { getStateManager } from "./module-state-manager";
+import { NpmRunner } from "./module-npm-runner";
 
 
 interface RawModuleConfig {
@@ -61,7 +62,7 @@ export class ModuleInfo {
     return this._config.path;
   }
 
-  public get needsNpmInstall(): boolean {
+  public get managedByNPM(): boolean {
     return this._config.npmInstall;
   }
 
@@ -217,25 +218,29 @@ export class ModuleInfo {
   }
 
 
-  public async install(): Promise<void> {
-    if (fs.existsSync(path.join(this.path, "node_modules")) || !this.needsNpmInstall) {
+  public async installIfDepsNotInitialized(): Promise<void> {
+    if (!this.managedByNPM || fs.existsSync(path.join(this.path, "node_modules"))) {
       return;
     }
 
-    const runner = new ModuleNpmRunner(this);
-    await runner.install();
+    await NpmRunner.install(this);
 
-    await this.buildModuleIfChanged();
+    await this.buildIfChanged();
   }
 
 
-  public async buildModuleIfChanged(): Promise<boolean> {
-    let stateManager = new ModuleStateManager(this);
-    if (await stateManager.needsRebuild(BUILD_TAG)) {
+  public async buildIfChanged(): Promise<boolean> {
+    const buildSubset = new BuildDependenciesSubset();
+    const stateManager = getStateManager();
+
+    if (await stateManager.isSubsetChanged(this, buildSubset)) {
       await this.buildModule();
-      await stateManager.saveActualState(BUILD_TAG);
+
+      stateManager.saveState(this, await stateManager.getActualState(this));
+
       return true;
     }
+
     return false;
   }
 
@@ -267,11 +272,6 @@ export class ModuleInfo {
     }
 
     return Object.keys(packageJSON.scripts || {}).indexOf(scriptName) >= 0;
-  }
-
-
-  public isFileShouldBePublished(filepath: string): boolean {
-    return !this.isIgnoredByRules(filepath) && this.isModuleFile(filepath);
   }
 
 

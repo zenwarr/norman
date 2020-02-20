@@ -1,11 +1,9 @@
 import * as chalk from "chalk";
 import { getServer, LocalNpmServer } from "../server";
 import * as path from "path";
-import { ModulesFeeder } from "../module-watcher";
-import { ModuleSynchronizer } from "../module-synchronizer";
 import { getArgs } from "../arguments";
 import { getConfig } from "../config";
-import { ModulePackager } from "../module-packager";
+import { ModuleSynchronizer } from "../module-synchronizer";
 
 
 export async function syncCommand() {
@@ -16,20 +14,11 @@ export async function syncCommand() {
     return;
   }
 
-  if (args.buildDeps && args.watch) {
-    console.log(chalk.red("--build-deps cannot be used with --watch"));
-    process.exit();
-    return;
-  }
-
   await LocalNpmServer.init();
-  await ModulePackager.prepackLocalModules();
 
   try {
     let argPath = args.path;
-    let localModule = config.modules.find(module => {
-      return module.name === argPath;
-    });
+    let localModule = config.modules.find(module => module.name === argPath);
 
     if (!localModule) {
       if (!path.isAbsolute(argPath)) {
@@ -56,22 +45,14 @@ export async function syncCommand() {
       }
     }
 
-    if (!localModule.needsNpmInstall) {
+    if (!localModule.managedByNPM) {
       console.log(chalk.red(`Cannot sync module: 'npmInstall' for module ${ localModule.name } is false`));
       process.exit(-1);
       return;
     }
 
-    if (args.watch) {
-      let feeder = new ModulesFeeder([ localModule ]);
-      await feeder.start();
-    } else {
-      let synchronizer = new ModuleSynchronizer(localModule);
-      await synchronizer.sync(args.buildDeps);
-    }
+    await ModuleSynchronizer.syncRoots([ localModule ], args.buildDeps);
   } finally {
-    if (!args.watch) {
-      await getServer().stop();
-    }
+    await getServer().stop();
   }
 }

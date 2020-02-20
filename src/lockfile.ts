@@ -2,7 +2,7 @@ import * as fs from "fs-extra";
 import * as path from "path";
 import { resolveRegistryUrl } from "./registry-paths";
 import { getConfig } from "./config";
-import { ModulePackager } from "./module-packager";
+import { getPackager} from "./module-packager";
 import { ModuleInfo } from "./module-info";
 
 
@@ -75,31 +75,47 @@ export class Lockfile {
         return;
       }
 
-      const packager = new ModulePackager(localModule);
-      dep.integrity = packager.getActualTarballIntegrity();
+      dep.integrity = getPackager().getPrepackagedArchiveIntegrity(localModule);
     });
+  }
+
+
+  public async getDepIntegrity(npmName: string): Promise<string | undefined> {
+    const content = this.load();
+
+    if (!content.dependencies) {
+      return undefined;
+    }
+
+    for (const depName of Object.keys(content.dependencies)) {
+      if (depName === npmName) {
+        return content.dependencies[depName].integrity;
+      }
+    }
+
+    return undefined;
   }
 
 
   private load(): LockfileContent {
     const content: any = fs.readJSONSync(this._filename);
     if (typeof content !== "object") {
-      throw new Error(this.validationErrorText("content not an object"));
+      throw new Error(this.getValidationErrorText("content not an object"));
     }
 
     if ("lockfileVersion" in content && content.lockfileVersion !== 1) {
-      throw new Error(this.validationErrorText(`unsupported version ${ content.lockfileVersion }, expected 1`));
+      throw new Error(this.getValidationErrorText(`unsupported version ${ content.lockfileVersion }, expected 1`));
     }
 
     if ("dependencies" in content && typeof content.dependencies !== "object") {
-      throw new Error(this.validationErrorText("dependencies is not an object"));
+      throw new Error(this.getValidationErrorText("dependencies is not an object"));
     }
 
     return content;
   }
 
 
-  private validationErrorText(text: string) {
+  private getValidationErrorText(text: string) {
     return `Lockfile "${ this.filename }" is invalid: ${ text }`;
   }
 

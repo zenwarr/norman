@@ -12,13 +12,17 @@ export enum WalkerAction {
 export type LocalModuleWalker = (module: ModuleInfo) => Promise<WalkerAction | void>;
 
 
+/**
+ * Returns list of all local modules listed in `dependencies` and `devDependencies` of the given module.
+ * @param module
+ */
 export function getDirectLocalDeps(module: ModuleInfo): ModuleInfo[] {
   const config = getConfig();
   return utils.getDirectDeps(module.path).map(moduleName => config.getModuleInfo(moduleName)).filter(dep => dep != null) as ModuleInfo[];
 }
 
 
-export async function walkDryLocalTreeSubset(modules: ModuleInfo[], walker: LocalModuleWalker): Promise<void> {
+export async function walkDryLocalTreeFromMultipleRoots(modules: ModuleInfo[], walker: LocalModuleWalker): Promise<void> {
   const walked = new Set<string>();
 
   const walkModule = async(module: ModuleInfo, deps: ModuleInfo[], parents: string[]): Promise<WalkerAction> => {
@@ -51,6 +55,14 @@ export async function walkDryLocalTreeSubset(modules: ModuleInfo[], walker: Loca
 }
 
 
-export async function walkDryLocalTree(walker: LocalModuleWalker): Promise<void> {
-  return walkDryLocalTreeSubset(getConfig().modules, walker);
+export async function walkAllLocalModules(walker: LocalModuleWalker): Promise<void> {
+  return walkDryLocalTreeFromMultipleRoots(getConfig().modules, walker);
+}
+
+
+/**
+ * Walks dependency tree of the given module in bottom-up order.
+ */
+export async function walkDependencyTree(module: ModuleInfo, walker: LocalModuleWalker): Promise<void> {
+  return walkDryLocalTreeFromMultipleRoots([ module ], walker);
 }

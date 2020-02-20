@@ -1,33 +1,33 @@
-import { ModuleOperator } from "./base";
 import * as utils from "./utils";
 import { Lockfile } from "./lockfile";
 import { getNpmRc } from "./npmrc";
 import { getServer } from "./server";
+import { ModuleInfo } from "./module-info";
 
 
-export class ModuleNpmRunner extends ModuleOperator {
-  public async install(): Promise<void> {
+export namespace NpmRunner {
+  export async function install(module: ModuleInfo): Promise<void> {
     await utils.cleanNpmCache();
 
     let lockfile: Lockfile | undefined;
-    if (this.module.hasLockFile()) {
-      lockfile = Lockfile.forModule(this.module);
+    if (module.hasLockFile()) {
+      lockfile = Lockfile.forModule(module);
       lockfile.updateIntegrity();
     }
 
-    await this.run("install");
+    await run(module, "install");
 
     if (lockfile) {
       lockfile.updateResolveUrl();
     }
 
-    await this.run("prune");
+    await run(module, "prune");
 
     await utils.cleanNpmCache();
   }
 
 
-  public buildNpmEnv(): NodeJS.ProcessEnv {
+  export function buildNpmEnv(): NodeJS.ProcessEnv {
     const server = getServer();
 
     let result = process.env;
@@ -44,14 +44,14 @@ export class ModuleNpmRunner extends ModuleOperator {
   }
 
 
-  protected async run(args: string | string[], options?: utils.SpawnOptions): Promise<string> {
+  export async function run(module: ModuleInfo, args: string | string[], options?: utils.SpawnOptions): Promise<string> {
     if (typeof args === "string") {
       args = [ args ];
     }
 
     return utils.runCommand(utils.getNpmExecutable(), args, {
-      cwd: this.module.path,
-      env: this.buildNpmEnv(),
+      cwd: module.path,
+      env: buildNpmEnv(),
       ...options
     });
   }

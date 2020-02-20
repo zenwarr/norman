@@ -10,7 +10,6 @@ export type Arguments = {
   subCommand: "sync";
   buildDeps: boolean;
   path: string;
-  watch: string;
 } | {
   subCommand: "sync-all";
   buildDeps: boolean;
@@ -62,12 +61,6 @@ export class ArgumentsManager {
       action: "storeTrue",
       defaultValue: false,
       dest: "buildDeps"
-    });
-    syncParser.addArgument("--watch", {
-      help: "Watch for changes in dependent modules and sync immediately",
-      action: "storeTrue",
-      defaultValue: false,
-      dest: "watch"
     });
     syncParser.addArgument("path", { help: "Path to module to synchronize" });
 

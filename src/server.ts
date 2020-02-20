@@ -12,7 +12,7 @@ import { AddressInfo } from "net";
 import { getConfig } from "./config";
 import { ServiceLocator } from "./locator";
 import { getNpmRc } from "./npmrc";
-import { ModulePackager } from "./module-packager";
+import { getPackager} from "./module-packager";
 
 
 const accept = require("accept");
@@ -213,8 +213,7 @@ export class LocalNpmServer {
     let localModule = config.modules.find(module => module.name === packageName);
     if (localModule) {
       try {
-        let packager = new ModulePackager(localModule);
-        res.sendFile(await packager.getActualTarballPath());
+        res.sendFile(await getPackager().getPrepackagedArchivePath(localModule));
       } catch (error) {
         console.error(error);
       }
@@ -273,7 +272,7 @@ export class LocalNpmServer {
   }
 
 
-  public static cleanCache(): void {
+  public cleanCache(): void {
     fs.removeSync(TARBALL_CACHE_DIR);
   }
 
