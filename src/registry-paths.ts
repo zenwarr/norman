@@ -1,7 +1,7 @@
 import * as url from "url";
 import { getConfig } from "./config";
 import { getNpmRc } from "./npmrc";
-import { ModuleInfo, ModuleNpmName } from "./module-info";
+import { LocalModule, ModuleNpmName } from "./local-module";
 
 
 export function resolveRegistryUrl(proxyUrl: string, version: string): string {
@@ -29,7 +29,7 @@ export function resolveRemoteTarballForLocalModule(moduleName: string, version: 
     throw new Error(`Failed to resolve remote tarball URL for local module "${ moduleName }": local module not found`);
   } else {
     const registry = getRegistryForModule(module);
-    return buildTarballUrl(registry, module.npmName, version);
+    return buildTarballUrl(registry, module.checkedName, version);
   }
 }
 
@@ -43,7 +43,7 @@ function buildTarballUrl(registry: string, moduleName: ModuleNpmName, version: s
 }
 
 
-export function getRegistryForModule(module: ModuleInfo) {
+export function getRegistryForModule(module: LocalModule) {
   const npmrc = getNpmRc();
-  return npmrc.getCustomRegistry("@" + module.npmName.org) || npmrc.defaultRegistry;
+  return npmrc.getCustomRegistry("@" + module.checkedName.scope) || npmrc.defaultRegistry;
 }

@@ -2,7 +2,7 @@ import { getServer, LocalNpmServer } from "../server";
 import * as chalk from "chalk";
 import { getArgs } from "../arguments";
 import { getConfig } from "../config";
-import { ModuleUpgrade } from "../module-upgrader";
+import { getOutdated, upgradeDependency } from "./upgrade";
 
 
 export async function outdatedCommand() {
@@ -19,14 +19,14 @@ export async function outdatedCommand() {
     let results: any = {};
     let index = 1;
 
-    let modsToAnalyze = args.withIncluded ? config.modules : config.modules.filter(mod => mod.isMain);
+    let modsToAnalyze = args.withIncluded ? config.modules : config.modules.filter(mod => mod.config.isFromMainProject);
     for (let mod of modsToAnalyze) {
       console.log(`[${ index }/${ modsToAnalyze.length }] Analyzing dependencies of "${ mod.name }"...`);
       ++index;
 
-      let result = await ModuleUpgrade.getOutdated(mod);
+      let result = await getOutdated(mod);
       if (Object.keys(result).length) {
-        results[mod.name] = result;
+        results[mod.checkedName.name] = result;
       }
     }
 
@@ -83,7 +83,11 @@ async function upgradeModules(outdatedData: any, hard: boolean): Promise<void> {
   const config = getConfig();
 
   for (let mod of config.modules) {
-    let modData = outdatedData[mod.name];
+    if (!mod.name) {
+      continue;
+    }
+
+    let modData = outdatedData[mod.name.name];
     if (!modData) {
       continue;
     }
@@ -97,7 +101,7 @@ async function upgradeModules(outdatedData: any, hard: boolean): Promise<void> {
 
       console.log(`Upgrading dependencies of "${ mod.name }": "${ dep }@${ depData.current }" -> "${ dep }@${ installVersion }"`);
       try {
-        await ModuleUpgrade.upgradeDependency(mod, dep, installVersion);
+        await upgradeDependency(mod, dep, installVersion);
       } catch (error) {
         console.error(chalk.red(`Failed to upgrade dependency of "${ mod.name }": "${ dep }" to version ${ installVersion }`));
       }

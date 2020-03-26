@@ -2,19 +2,20 @@ import * as fs from "fs-extra";
 import * as path from "path";
 import * as os from "os";
 import * as crypto from "crypto";
-import { ModuleInfo } from "./module-info";
-import { ModuleSubset } from "./module-subset";
-import { BuildDependenciesSubset } from "./build-dependencies-subset";
+import { LocalModule } from "./local-module";
+import { ModuleSubset } from "./subsets/module-subset";
+import { BuildDependenciesSubset } from "./subsets/build-dependencies-subset";
 import { ServiceLocator } from "./locator";
-import { PublishDependenciesSubset } from "./publish-dependencies-subset";
+import { PublishDependenciesSubset } from "./subsets/publish-dependencies-subset";
+import { AllFilesSubset } from "./subsets/all-files-subset";
 
 
 export type SubsetFilesState = { [path: string]: number };
 
 
 export interface ModuleState {
-  module: string;
-  timestamp: number;
+  modulePath: string;
+  ts: number;
   files: SubsetFilesState;
 }
 
@@ -27,24 +28,25 @@ export class ModuleStateManager {
    * Calculates actual module state based on content of files currently on disc.
    * Module state is object that contains modification time for some subset of files inside a module.
    */
-  public async getActualState(module: ModuleInfo): Promise<ModuleState> {
+  public async getActualState(mod: LocalModule): Promise<ModuleState> {
     const resultFiles: SubsetFilesState = {};
 
-    await module.walkModuleFiles(async(filename, stat) => {
-      if (this.isInAnySubset(module, filename)) {
+    const subset = new AllFilesSubset(mod);
+    await subset.walk(async (filename, stat) => {
+      if (this.isInAnySubset(mod, filename)) {
         resultFiles[filename] = stat.mtime.valueOf();
       }
     });
 
     return {
-      module: module.name,
-      timestamp: (new Date()).valueOf(),
+      modulePath: mod.path,
+      ts: (new Date()).valueOf(),
       files: resultFiles
     };
   }
 
 
-  public getSavedState(module: ModuleInfo): ModuleState | null {
+  public getSavedState(module: LocalModule): ModuleState | null {
     const stateFilePath = this.getModuleStateFilePath(module);
 
     if (this._stateCache.has(stateFilePath)) {
@@ -73,7 +75,7 @@ export class ModuleStateManager {
   }
 
 
-  public saveState(module: ModuleInfo, state: ModuleState): void {
+  public saveState(module: LocalModule, state: ModuleState): void {
     let stateFilePath = this.getModuleStateFilePath(module);
 
     fs.outputJSONSync(stateFilePath, state, {
@@ -84,14 +86,14 @@ export class ModuleStateManager {
   }
 
 
-  public async isSubsetChanged(module: ModuleInfo, subset: ModuleSubset): Promise<boolean> {
+  public async isSubsetChanged(module: LocalModule, subset: ModuleSubset): Promise<boolean> {
     let savedState = this.getSavedState(module);
     if (!savedState) {
       return true;
     }
 
-    let actualSubsetState = this.getSubsetState(module, subset, await this.getActualState(module));
-    const savedSubsetState = this.getSubsetState(module, subset, savedState);
+    let actualSubsetState = await this.getSubsetState(module, subset, await this.getActualState(module));
+    const savedSubsetState = await this.getSubsetState(module, subset, savedState);
 
     if (savedSubsetState.length !== actualSubsetState.length) {
       return true;
@@ -107,11 +109,11 @@ export class ModuleStateManager {
   }
 
 
-  public getSubsetState(module: ModuleInfo, subset: ModuleSubset, state: ModuleState): SubsetFilesState {
+  public async getSubsetState(module: LocalModule, subset: ModuleSubset, state: ModuleState): Promise<SubsetFilesState> {
     const result: SubsetFilesState = {};
 
     for (const filename in state.files) {
-      if (subset.isFileIncluded(module, filename)) {
+      if (await subset.isFileIncluded(filename)) {
         result[filename] = state.files[filename];
       }
     }
@@ -130,18 +132,22 @@ export class ModuleStateManager {
   }
 
 
-  private getModuleStateFilePath(module: ModuleInfo): string {
+  private getModuleStateFilePath(module: LocalModule): string {
     let hash = crypto.createHash("sha256").update(module.path).digest("hex");
     return path.join(STATE_DIR, `state-${ hash }.json`);
   }
 
 
-  private isInAnySubset(module: ModuleInfo, filename: string): boolean {
-    return this._subsets.some(subset => subset.isFileIncluded(module, filename));
+  private isInAnySubset(module: LocalModule, filename: string): boolean {
+    const subsets = [
+      new BuildDependenciesSubset(module),
+      new PublishDependenciesSubset(module)
+    ];
+
+    return subsets.some(subset => subset.isFileIncluded(filename));
   }
 
 
-  private _subsets: ModuleSubset[] = [ new BuildDependenciesSubset(), new PublishDependenciesSubset() ];
   private _stateCache = new Map<string, ModuleState | null>();
 }
 

@@ -6,11 +6,14 @@ import { fetchCommand } from "./commands/fetch";
 import { syncCommand } from "./commands/sync";
 import { cleanCommand } from "./commands/clean";
 import { syncAllCommand } from "./commands/sync-all";
-import { outdatedCommand } from "./commands/outdated";
 import { ArgumentsManager, getArgs } from "./arguments";
 import { PluginManager } from "./plugins";
 import { NpmRC } from "./npmrc";
 import { ModuleStateManager } from "./module-state-manager";
+import { npmCommand } from "./commands/npm";
+import { ModulePublisher } from "./ModulePublisher";
+import { outdatedCommand } from "./upgrade/outdated-command";
+import { publishCommand } from "./commands/publish";
 
 
 async function asyncStart(): Promise<void> {
@@ -19,6 +22,7 @@ async function asyncStart(): Promise<void> {
   NpmRC.init();
   PluginManager.init();
   ModuleStateManager.init();
+  ModulePublisher.init();
 
   let args = getArgs();
 
@@ -29,7 +33,9 @@ async function asyncStart(): Promise<void> {
     sync: syncCommand,
     clean: cleanCommand,
     "sync-all": syncAllCommand,
-    outdated: outdatedCommand
+    outdated: outdatedCommand,
+    npm: npmCommand,
+    publish: publishCommand
   };
 
   const command = COMMANDS[args.subCommand];
@@ -48,14 +54,3 @@ export function start(): void {
     process.exit(-1);
   });
 }
-
-
-process.on("uncaughtException", (error) => {
-  console.log(chalk.red(`UNHANDLED EXCEPTION: ${ error.message }: ${ error.stack }`));
-  process.exit(-1);
-});
-
-process.on("unhandledRejection", (error: any) => {
-  console.log(chalk.red(`UNHANDLED REJECTION: ${ error.message }: ${ error.stack }`));
-  process.exit(-1);
-});

@@ -18,7 +18,7 @@ export async function syncCommand() {
 
   try {
     let argPath = args.path;
-    let localModule = config.modules.find(module => module.name === argPath);
+    let localModule = config.modules.find(module => module.name && module.name.name === argPath);
 
     if (!localModule) {
       if (!path.isAbsolute(argPath)) {
@@ -45,13 +45,13 @@ export async function syncCommand() {
       }
     }
 
-    if (!localModule.managedByNPM) {
+    if (!localModule.useNpm) {
       console.log(chalk.red(`Cannot sync module: 'npmInstall' for module ${ localModule.name } is false`));
       process.exit(-1);
       return;
     }
 
-    await ModuleSynchronizer.syncRoots([ localModule ], args.buildDeps);
+    await ModuleSynchronizer.syncRoots([ localModule ], true);
   } finally {
     await getServer().stop();
   }

@@ -1,33 +1,20 @@
+import * as fs from "fs-extra";
 import * as utils from "./utils";
 import { Lockfile } from "./lockfile";
 import { getNpmRc } from "./npmrc";
 import { getServer } from "./server";
-import { ModuleInfo } from "./module-info";
+import { LocalModule } from "./local-module";
 
 
 export namespace NpmRunner {
-  export async function install(module: ModuleInfo): Promise<void> {
-    await utils.cleanNpmCache();
+  export async function install(mod: LocalModule): Promise<void> {
+    await run(mod, "install");
 
-    let lockfile: Lockfile | undefined;
-    if (module.hasLockFile()) {
-      lockfile = Lockfile.forModule(module);
-      lockfile.updateIntegrity();
-    }
-
-    await run(module, "install");
-
-    if (lockfile) {
-      lockfile.updateResolveUrl();
-    }
-
-    await run(module, "prune");
-
-    await utils.cleanNpmCache();
+    await run(mod, "prune");
   }
 
 
-  export function buildNpmEnv(): NodeJS.ProcessEnv {
+  export function buildNpmEnv(mod: LocalModule): NodeJS.ProcessEnv {
     const server = getServer();
 
     let result = process.env;
@@ -40,19 +27,42 @@ export namespace NpmRunner {
 
     result.npm_config_registry = server.address;
 
+    if (Lockfile.existsInModule(mod)) {
+      result["npm_config_package-lock"] = "true";
+    }
+
     return result;
   }
 
 
-  export async function run(module: ModuleInfo, args: string | string[], options?: utils.SpawnOptions): Promise<string> {
+  export async function run(module: LocalModule, args: string | string[], options?: utils.SpawnOptions): Promise<string> {
     if (typeof args === "string") {
       args = [ args ];
     }
 
-    return utils.runCommand(utils.getNpmExecutable(), args, {
+    await utils.cleanNpmCache();
+
+    let lockfile: Lockfile | undefined;
+    let lockfileModifyTs: number | undefined;
+    if (Lockfile.existsInModule(module)) {
+      lockfile = Lockfile.forModule(module);
+      lockfile.updateIntegrity();
+      lockfileModifyTs = fs.statSync(lockfile.filename).mtimeMs;
+    }
+
+    let result = await utils.runCommand(utils.getNpmExecutable(), args, {
       cwd: module.path,
-      env: buildNpmEnv(),
+      env: buildNpmEnv(module),
       ...options
     });
+
+    if (lockfile) {
+      let afterModifyTs = fs.statSync(lockfile.filename).mtimeMs;
+      if (afterModifyTs !== lockfileModifyTs) {
+        lockfile.updateResolveUrl();
+      }
+    }
+
+    return result;
   }
 }

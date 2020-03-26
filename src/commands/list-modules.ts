@@ -7,9 +7,10 @@ export async function listModulesCommand() {
   const config = getConfig();
 
   const data = config.modules.map(module => ({
-    name: module.name,
+    name: module.name ? module.name.name : "<no name>",
     path: module.path,
-    registry: getRegistryForModule(module)
+    registry: getRegistryForModule(module),
+    useNpm: module.useNpm
   }));
 
   console.log(columnify(data, {

@@ -1,23 +1,28 @@
-import { ModuleInfo } from "../module-info";
-import { getConfig } from "../config";
-import { getDirectLocalDeps } from "../dry-dependency-tree";
+import { LocalModule } from "../local-module";
+import { getDirectLocalDeps, walkAllLocalModules } from "../dry-dependency-tree";
+import * as columnify from "columnify";
 
 
 export async function dependencyTreeCommand() {
-  let isFirst = true;
-
-  const printModuleTree = (leaf: ModuleInfo, level: number = 0) => {
-    let prefix = level === 0 ? (isFirst ? "- " : "\n- ") : " ".repeat(level * 2 + 2);
-    console.log(`${ prefix }${ leaf.name }`);
-
-    const deps = getDirectLocalDeps(leaf);
-    for (let dep of deps) {
-      printModuleTree(dep, level + 1);
-    }
-  };
-
-  for (let treeRoot of getConfig().modules) {
-    printModuleTree(treeRoot);
-    isFirst = false;
+  function getName(leaf: LocalModule) {
+    return leaf.name ? leaf.name.name : "<no name>";
   }
+
+  let output: { name: string, deps: string }[] = [];
+
+  async function printModuleTree(leaf: LocalModule) {
+    let deps = getDirectLocalDeps(leaf).map(mod => getName(mod));
+    let depsLine = deps.length ? `[${ deps.join(", ") }]` : "";
+
+    output.push({
+      name: getName(leaf),
+      deps: depsLine
+    });
+  }
+
+  await walkAllLocalModules(printModuleTree);
+
+  console.log(columnify(output, {
+    columnSplitter: " | "
+  }));
 }

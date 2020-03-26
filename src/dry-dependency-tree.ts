@@ -1,4 +1,4 @@
-import { ModuleInfo } from "./module-info";
+import { LocalModule } from "./local-module";
 import * as utils from "./utils";
 import { getConfig } from "./config";
 
@@ -9,39 +9,47 @@ export enum WalkerAction {
 }
 
 
-export type LocalModuleWalker = (module: ModuleInfo) => Promise<WalkerAction | void>;
+export type LocalModuleWalker = (module: LocalModule) => Promise<WalkerAction | void>;
 
 
 /**
  * Returns list of all local modules listed in `dependencies` and `devDependencies` of the given module.
  * @param module
  */
-export function getDirectLocalDeps(module: ModuleInfo): ModuleInfo[] {
+export function getDirectLocalDeps(module: LocalModule): LocalModule[] {
+  if (!module.useNpm) {
+    return [];
+  }
+
   const config = getConfig();
-  return utils.getDirectDeps(module.path).map(moduleName => config.getModuleInfo(moduleName)).filter(dep => dep != null) as ModuleInfo[];
+  return utils.getDirectDeps(module.path).map(moduleName => config.getModuleInfo(moduleName)).filter(dep => dep != null) as LocalModule[];
 }
 
 
-export async function walkDryLocalTreeFromMultipleRoots(modules: ModuleInfo[], walker: LocalModuleWalker): Promise<void> {
+export async function walkDryLocalTreeFromMultipleRoots(modules: LocalModule[], walker: LocalModuleWalker): Promise<void> {
   const walked = new Set<string>();
 
-  const walkModule = async(module: ModuleInfo, deps: ModuleInfo[], parents: string[]): Promise<WalkerAction> => {
-    if (walked.has(module.name)) {
+  const walkModule = async(module: LocalModule, deps: LocalModule[], parents: string[]): Promise<WalkerAction> => {
+    if (!module.name || walked.has(module.name.name)) {
       return WalkerAction.Continue;
     }
 
     for (let dep of deps) {
-      if (parents.indexOf(dep.name) >= 0) {
+      if (!dep.name) {
+        continue;
+      }
+
+      if (parents.indexOf(dep.name.name) >= 0) {
         throw new Error(`Recursive dependency: ${ dep.name }, required by ${ parents.join(" -> ") }`);
       }
 
-      const action = await walkModule(dep, getDirectLocalDeps(dep), [ ...parents, module.name ]);
+      const action = await walkModule(dep, getDirectLocalDeps(dep), [ ...parents, module.name.name ]);
       if (action === WalkerAction.Stop) {
         return WalkerAction.Stop;
       }
     }
 
-    walked.add(module.name);
+    walked.add(module.name.name);
 
     return await walker(module) || WalkerAction.Continue;
   };
@@ -63,6 +71,6 @@ export async function walkAllLocalModules(walker: LocalModuleWalker): Promise<vo
 /**
  * Walks dependency tree of the given module in bottom-up order.
  */
-export async function walkDependencyTree(module: ModuleInfo, walker: LocalModuleWalker): Promise<void> {
+export async function walkDependencyTree(module: LocalModule, walker: LocalModuleWalker): Promise<void> {
   return walkDryLocalTreeFromMultipleRoots([ module ], walker);
 }

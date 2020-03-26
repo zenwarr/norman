@@ -1,8 +1,8 @@
 import * as chalk from "chalk";
 import { getServer} from "../server";
-import { getPackager} from "../module-packager";
 import { getArgs } from "../arguments";
 import { getStateManager } from "../module-state-manager";
+import { getPublisher } from "../ModulePublisher";
 
 
 export function cleanCommand() {
@@ -24,6 +24,6 @@ export function cleanCommand() {
 
   if (args.cleanWhat === "all") {
     console.log(chalk.green("Cleaning temp files"));
-    getPackager().cleanTemp();
+    getPublisher().cleanTemp();
   }
 }

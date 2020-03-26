@@ -7,12 +7,12 @@ import * as path from "path";
 import * as url from "url";
 import * as contentType from "content-type";
 import * as crypto from "crypto";
-import { ModuleInfo } from "./module-info";
+import { LocalModule } from "./local-module";
 import { AddressInfo } from "net";
 import { getConfig } from "./config";
 import { ServiceLocator } from "./locator";
 import { getNpmRc } from "./npmrc";
-import { getPackager} from "./module-packager";
+import { getPublisher } from "./ModulePublisher";
 
 
 const accept = require("accept");
@@ -85,7 +85,7 @@ export class LocalNpmServer {
   protected async onGetPackage(packageName: string, req: express.Request, res: express.Response): Promise<void> {
     const config = getConfig();
 
-    let localModule = config.modules.find(module => module.name === packageName);
+    let localModule = config.modules.find(module => module.name && module.name.name === packageName);
     if (localModule) {
       let acceptedTypes: string[] = accept.mediaTypes(req.headers.accept);
       if (acceptedTypes.length && acceptedTypes[0] === "application/vnd.npm.install-v1+json") {
@@ -169,28 +169,28 @@ export class LocalNpmServer {
   }
 
 
-  protected async getLocalModulePackument(module: ModuleInfo): Promise<any> {
+  protected async getLocalModulePackument(module: LocalModule): Promise<any> {
     return this.getLocalModuleAbbrPackument(module);
   }
 
 
-  protected async getLocalModuleAbbrPackument(module: ModuleInfo): Promise<any> {
-    let moduleMeta = fs.readJSONSync(path.join(module.path, "package.json"));
-    let moduleVersion: string = moduleMeta.version;
+  protected async getLocalModuleAbbrPackument(module: LocalModule): Promise<any> {
+    let packageJSON = getPublisher().getPublishedPackageJSON(module);
+    let version = packageJSON.version;
 
     let versionObject: any = {
       name: module.name,
-      version: moduleVersion,
+      version,
       directories: {},
       _hasShrinkwrap: false,
       dist: {
-        tarball: `${ this.address }/tarballs/${ module.name }?norman=local&name=${ encodeURIComponent(module.name) }`
+        tarball: `${ this.address }/tarballs/${ module.name }?norman=local&name=${ encodeURIComponent(module.checkedName.name) }`
       }
     };
 
     for (let key of [ "dependencies", "devDependencies", "optionalDependencies", "bundleDependencies", "peerDependencies", "bin", "engines" ]) {
-      if (moduleMeta[key]) {
-        versionObject[key] = moduleMeta[key];
+      if (packageJSON[key]) {
+        versionObject[key] = packageJSON[key];
       }
     }
 
@@ -198,10 +198,10 @@ export class LocalNpmServer {
       name: module.name,
       modified: new Date().toString(),
       "dist-tags": {
-        latest: moduleVersion
+        latest: version
       },
       versions: {
-        [moduleVersion]: versionObject
+        [version]: versionObject
       }
     };
   }
@@ -210,10 +210,10 @@ export class LocalNpmServer {
   protected async onGetTarball(packageName: string, req: express.Request, res: express.Response): Promise<void> {
     const config = getConfig();
 
-    let localModule = config.modules.find(module => module.name === packageName);
+    let localModule = config.modules.find(module => module.name && module.name.name === packageName);
     if (localModule) {
       try {
-        res.sendFile(await getPackager().getPrepackagedArchivePath(localModule));
+        res.sendFile(await getPublisher().getTarballPath(localModule));
       } catch (error) {
         console.error(error);
       }

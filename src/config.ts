@@ -1,4 +1,4 @@
-import { ModuleInfo } from "./module-info";
+import { LocalModule } from "./local-module";
 import * as path from "path";
 import * as fs from "fs-extra";
 import * as chalk from "chalk";
@@ -6,17 +6,17 @@ import { ServiceLocator } from "./locator";
 import { getArgs } from "./arguments";
 
 
-const CONFIG_FILE_NAME = ".norman.json";
+const CONFIG_FILE_NAME = "norman.json";
 
 
 interface RawConfig {
   modules?: unknown;
   modulesDirectory?: unknown;
-  defaultNpmIgnore?: unknown;
-  defaultIgnoreOrg?: unknown;
   includeModules?: unknown;
+  defaultNpmIgnore?: unknown;
+  defaultIgnoreScope?: unknown;
   defaultBranch?: unknown;
-  defaultNpmInstall?: unknown;
+  defaultUseNpm?: unknown;
   defaultBuildTriggers?: unknown;
 }
 
@@ -24,46 +24,46 @@ interface RawConfig {
 interface ConfigInit {
   mainConfigDir: string;
   mainModulesDir: string;
-  defaultIgnoreOrg: boolean;
-  defaultNpmIgnorePath: string | boolean;
+  defaultIgnoreScope: boolean;
+  defaultNpmIgnorePath: string | undefined;
   defaultBranch: string;
-  defaultNpmInstall: boolean;
+  defaultUseNpm: boolean;
   defaultBuildTriggers: string[];
 }
 
 
 export class Config {
-  private _modules: ModuleInfo[] = [];
+  private _modules: LocalModule[] = [];
 
-  public get mainConfigDir(): string {
+  public get mainConfigDir() {
     return this._config.mainConfigDir;
   }
 
-  public get mainModulesDir(): string {
+  public get mainModulesDir() {
     return this._config.mainModulesDir;
   }
 
-  public get defaultBranch(): string {
+  public get defaultBranch() {
     return this._config.defaultBranch;
   }
 
-  public get defaultIgnoreOrg(): boolean {
-    return this._config.defaultIgnoreOrg;
+  public get defaultIgnoreScope() {
+    return this._config.defaultIgnoreScope;
   }
 
-  public get defaultNpmIgnoreHint(): string | boolean {
+  public get defaultNpmIgnore() {
     return this._config.defaultNpmIgnorePath;
   }
 
-  public get defaultNpmInstall(): boolean {
-    return this._config.defaultNpmInstall;
+  public get defaultUseNpm() {
+    return this._config.defaultUseNpm;
   }
 
-  public get defaultBuildTriggers(): string[] {
+  public get defaultBuildTriggers() {
     return this._config.defaultBuildTriggers;
   }
 
-  public get modules(): ModuleInfo[] {
+  public get modules() {
     return this._modules;
   }
 
@@ -72,8 +72,8 @@ export class Config {
   }
 
 
-  public getModuleInfo(moduleName: string): ModuleInfo | null {
-    return this._modules.find(module => module.name === moduleName) || null;
+  public getModuleInfo(moduleName: string): LocalModule | null {
+    return this._modules.find(module => module.name && module.name.name === moduleName) || null;
   }
 
 
@@ -83,7 +83,7 @@ export class Config {
     let mainModulesDir: string;
     if ("modulesDirectory" in rawConfig) {
       if (typeof rawConfig.modulesDirectory !== "string") {
-        throw new Error("`modulesDirectory' should be a string");
+        throw new Error("'modulesDirectory' should be a string");
       }
       if (!path.isAbsolute(rawConfig.modulesDirectory)) {
         mainModulesDir = path.resolve(mainConfigDir, rawConfig.modulesDirectory);
@@ -91,21 +91,21 @@ export class Config {
         mainModulesDir = rawConfig.modulesDirectory;
       }
     } else {
-      mainModulesDir = mainConfigDir;
+      throw new Error("'modulesDirectory' is missing");
     }
 
-    let defaultIgnoreOrg = false;
-    if ("defaultIgnoreOrg" in rawConfig) {
-      if (typeof rawConfig.defaultIgnoreOrg !== "boolean") {
-        throw new Error("'defaultIgnoreOrg' should be a boolean");
+    let defaultIgnoreScope = false;
+    if ("defaultIgnoreScope" in rawConfig) {
+      if (typeof rawConfig.defaultIgnoreScope !== "boolean") {
+        throw new Error("'defaultIgnoreScope' should be a boolean");
       }
-      defaultIgnoreOrg = rawConfig.defaultIgnoreOrg;
+      defaultIgnoreScope = rawConfig.defaultIgnoreScope;
     }
 
-    let defaultNpmIgnorePath: string | boolean = true;
+    let defaultNpmIgnorePath: string | undefined;
     if ("defaultNpmIgnore" in rawConfig) {
-      if (typeof rawConfig.defaultNpmIgnore !== "string" && typeof rawConfig.defaultNpmIgnore !== "boolean") {
-        throw new Error("'defaultNpmIgnoreHint' should be a string or a boolean");
+      if (typeof rawConfig.defaultNpmIgnore !== "string") {
+        throw new Error("'defaultNpmIgnore' should be a string");
       }
       defaultNpmIgnorePath = rawConfig.defaultNpmIgnore;
     }
@@ -118,30 +118,30 @@ export class Config {
       defaultBranch = rawConfig.defaultBranch;
     }
 
-    let defaultNpmInstall = true;
-    if ("defaultNpmInstall" in rawConfig) {
-      if (typeof rawConfig.defaultNpmInstall !== "boolean") {
-        throw new Error("'defaultNpmInstall' should be a string");
+    let defaultUseNpm = true;
+    if ("defaultUseNpm" in rawConfig) {
+      if (typeof rawConfig.defaultUseNpm !== "boolean") {
+        throw new Error("'defaultUseNpm' should be a string");
       }
-      defaultNpmInstall = rawConfig.defaultNpmInstall;
+      defaultUseNpm = rawConfig.defaultUseNpm;
     }
 
-    let defaultBuildDeps: string[] = [];
+    let defaultBuildTriggers: string[] = [];
     if ("defaultBuildTriggers" in rawConfig) {
       if (!Array.isArray(rawConfig.defaultBuildTriggers)) {
         throw new Error("'defaultBuildTriggers' should be an array of strings");
       }
-      defaultBuildDeps = rawConfig.defaultBuildTriggers;
+      defaultBuildTriggers = rawConfig.defaultBuildTriggers;
     }
 
     let appConfig = new Config({
       mainConfigDir,
       mainModulesDir,
-      defaultIgnoreOrg,
+      defaultIgnoreScope: defaultIgnoreScope,
       defaultNpmIgnorePath,
       defaultBranch,
-      defaultNpmInstall,
-      defaultBuildTriggers: defaultBuildDeps
+      defaultUseNpm: defaultUseNpm,
+      defaultBuildTriggers: defaultBuildTriggers
     });
 
     appConfig._modules = this.loadModules(configFilename, rawConfig, appConfig, isMainConfig, ignoreMissing);
@@ -150,20 +150,28 @@ export class Config {
   }
 
 
-  private static loadModules(configFilename: string, rawConfig: RawConfig, appConfig: Config, isMainConfig: boolean, ignoreMissing: boolean): ModuleInfo[] {
+  private static loadModules(configFilename: string, rawConfig: RawConfig, appConfig: Config, isMainConfig: boolean, ignoreMissing: boolean): LocalModule[] {
     let configDir = path.dirname(configFilename);
 
-    let modules: ModuleInfo[] = [];
+    let modules: LocalModule[] = [];
     if ("includeModules" in rawConfig) {
-      if (!Array.isArray(rawConfig.includeModules)) {
-        throw new Error("'includeModules' should be an array");
+      let includeModules: unknown[] = [];
+      if (typeof rawConfig.includeModules === "string") {
+        includeModules = [ rawConfig.includeModules ]
+      } else if (Array.isArray(rawConfig.includeModules)) {
+        includeModules = rawConfig.includeModules as string[];
+      } else {
+        throw new Error("'includeModules' should be an array or a string");
       }
-      for (let configPath of rawConfig.includeModules) {
-        if (typeof configPath !== "string") {
+
+      for (const includeModule of includeModules) {
+        if (typeof includeModule !== "string") {
           throw new Error("'includeModules' should be an array of strings");
         }
 
-        if (!path.isAbsolute(configPath)) {
+        let configPath = includeModule;
+
+        if (!path.isAbsolute(includeModule)) {
           configPath = path.resolve(configDir, configPath);
         }
 
@@ -174,9 +182,9 @@ export class Config {
           if (ignoreMissing) {
             console.log(chalk.yellow(`Ignoring "includeModules" for "${ configPath }", configuration file does not exist`));
             continue;
+          } else {
+            throw new Error(`Failed to include config at ${ configPath }: ${ error.message }`);
           }
-
-          throw new Error(`Failed to include config at ${ configPath }: ${ error.message }`);
         }
 
         if (configPathStat.isDirectory()) {
@@ -205,7 +213,7 @@ export class Config {
           throw new Error("'modules' should be an array of objects");
         }
 
-        modules.push(ModuleInfo.createFromConfig(rawModule, appConfig, isMainConfig, configDir));
+        modules.push(LocalModule.createFromConfig(rawModule, appConfig, isMainConfig, configDir));
       }
     }
 

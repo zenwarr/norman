@@ -1,5 +1,5 @@
 import { ServiceLocator } from "./locator";
-import { ArgumentParser } from "argparse";
+import * as argparse from "argparse";
 import * as path from "path";
 
 
@@ -8,11 +8,9 @@ export type Arguments = {
   ignoreMissingIncludedModules: boolean;
 } & ({
   subCommand: "sync";
-  buildDeps: boolean;
   path: string;
 } | {
   subCommand: "sync-all";
-  buildDeps: boolean;
 } | {
   subCommand: "fetch";
   noInstall: boolean;
@@ -28,6 +26,11 @@ export type Arguments = {
   upgrade: boolean;
   hard: boolean;
   withIncluded: boolean;
+} | {
+  subCommand: "npm",
+  args: string[]
+} | {
+  subCommand: "publish"
 });
 
 
@@ -37,7 +40,7 @@ export class ArgumentsManager {
   }
 
   protected constructor() {
-    let argparser = new ArgumentParser({
+    let argparser = new argparse.ArgumentParser({
       addHelp: true
     });
     argparser.addArgument([ "--config", "-c" ], {
@@ -56,21 +59,9 @@ export class ArgumentsManager {
     });
 
     let syncParser = subparsers.addParser("sync", { help: "Synchronizes a local module" });
-    syncParser.addArgument("--build-deps", {
-      help: "Builds dependent local modules before synchronization",
-      action: "storeTrue",
-      defaultValue: false,
-      dest: "buildDeps"
-    });
     syncParser.addArgument("path", { help: "Path to module to synchronize" });
 
-    let syncAllParser = subparsers.addParser("sync-all", { help: "Synchronize all local modules" });
-    syncAllParser.addArgument("--build-deps", {
-      help: "Build dependent local modules before synchronization",
-      action: "storeTrue",
-      defaultValue: false,
-      dest: "buildDeps"
-    });
+    subparsers.addParser("sync-all", { help: "Synchronize all local modules" });
 
     let fetchParser = subparsers.addParser("fetch", { help: "Fetches and initializes all local modules" });
     fetchParser.addArgument("--no-install", {
@@ -111,6 +102,15 @@ export class ArgumentsManager {
       defaultValue: false,
       dest: "withIncluded"
     });
+
+    let npmParser = subparsers.addParser("npm", { help: "Run npm command" });
+    npmParser.addArgument("args", {
+      help: "npm command arguments",
+      nargs: argparse.Const.REMAINDER,
+      defaultValue: []
+    });
+
+    subparsers.addParser("publish", { help: "Publish module" });
 
     let args: Arguments = argparser.parseArgs();
     this._args = args;

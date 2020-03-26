@@ -16,6 +16,7 @@ export type NpmConfig = {
 
 
 const NPMRC_FILENAME = ".npmrc";
+const DEFAULT_NPM_REGISTRY = "https://registry.npmjs.org/";
 
 
 export class NpmRC {
@@ -99,7 +100,7 @@ export class NpmRC {
     let profileConfig = loadNpmrc(path.join(os.homedir(), NPMRC_FILENAME));
 
     if (!projectConfig.registries.default && !profileConfig.registries.default) {
-      throw new Error(`No default NPM registry server found in npm config files. Make sure you have ${ NPMRC_FILENAME } files with explicit registry settings accessible`);
+      profileConfig.registries.default = DEFAULT_NPM_REGISTRY;
     }
 
     return {

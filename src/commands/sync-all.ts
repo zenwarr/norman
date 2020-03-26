@@ -1,9 +1,10 @@
 import { getServer, LocalNpmServer } from "../server";
 import { ModuleSynchronizer } from "../module-synchronizer";
-import * as chalk from "chalk";
 import { getArgs } from "../arguments";
 import { walkAllLocalModules } from "../dry-dependency-tree";
 import { getConfig } from "../config";
+import {fetchLocalModule} from "../fetch";
+import {installModuleDepsIfNotInitialized} from "../deps";
 
 
 export async function syncAllCommand() {
@@ -13,15 +14,14 @@ export async function syncAllCommand() {
     return;
   }
 
-  let shouldBuild = args.buildDeps;
-
   await LocalNpmServer.init();
 
   try {
-    await walkAllLocalModules(async module => module.fetch());
-    await walkAllLocalModules(async module => module.installIfDepsNotInitialized());
+    await walkAllLocalModules(async module => fetchLocalModule(module));
 
-    await ModuleSynchronizer.syncRoots(getConfig().modules, shouldBuild);
+    await walkAllLocalModules(async module => installModuleDepsIfNotInitialized(module));
+
+    await ModuleSynchronizer.syncRoots(getConfig().modules, true);
   } finally {
     await getServer().stop();
   }

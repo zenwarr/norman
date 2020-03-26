@@ -1,118 +1,105 @@
-# What is it?
+# Что это
 
-A tool to develop multi-package Node.js apps with ease.
+Инструмент, который пытается упростить разработку приложений на Node.js, которые состоят из нескольких пакетов.
 
-# Why not use `npm link` instead?
+# Это что, lerna?
 
-1. `npm link` is global.
-   Anything global is bad (although there are exceptions).
-2. In many cases, you cannot have `node_modules` directory inside a linked package, because the package does not know it was linked somewhere.
-   When the linked package requires another package, it looks for it in its own `node_modules`, not in `node_modules` of the package it was linked to.
-   Most of the time it works, but some packages (especially ones using singleton instances) are not happy to be imported that way.
-3. The layout of the application on development machine differs from the layout of your application in production.
-4. Circular linked dependencies is still a pain for many tools.
+Не совсем, хотя и решает похожую задачу.
+В отличие от lerna, этот инструмент не пытается создавать ссылки на общие зависимости или выводить их на уровень директории выше, как делает lerna.
+Цель norman -- воссоздать в окружении разработчика структуру node_modules, которая максимально соответствует той, которая будет в продакшене.
+Для этого он сихронизирует содержимое пакетов, копируя файлы и выступая в качестве локального npm-репозитория.
 
-# How to start?
+# Чем плох `npm link`?
 
-1. Install: `npm i -g node-norman`
-2. Create `.norman.json` config file and list modules you want to develop (see below for format).
-4. Run `norman fetch` in the directory where `.norman.json` is located (or give a path to the config with `norman --config ~/project/.norman.json fetch`).
-5. Norman is going to initialize local modules by cloning source code from repositories, optionally running `npm install` and build commands.
+1. `npm link` по умолчанию создает глобальную ссылку на пакет.
+  То есть, если необходимо иметь несколько версий одного модуля, то использовать его с помощью `npm link` довольно сложно.
+2. Модуль `B`, который был прилинкован в модуль `A`, может иметь свою директорию `node_modules`.
+  Если, при этом и у модуля `A`, и у модуля `B` есть общая зависомость `C` совместимых версий (которая при обычной установке была бы вынесена на верхний уровень), эти модули будут импортировать разные копии модуля `C`.
+  В большинстве случаев это работает, но не всегда, и может приводить к труднообнаружимым багам.
+3. Содержимое директории после установки из npm-репозитория, как правило, отличается от того, что находится в директории с исходниками на машине разработчика.
+  Из-за этого также может возникать ряд проблем.
+  Например, ts-loader отказывается собирать код, если рядом с импортируемым `.js` файлом находится `.ts` файл.
+  
+# Что делает norman?
 
-Now you are able to synchronize local modules.
-Imagine you develop three packages: `app`, `a` and `b`, where `app` depends on `a` and `b`.
-Before starting `app` you need to have actual versions of `a` and `b` in `app/node_modules`.
-Without norman you could create symlinks in `app/node_modules` pointing to `a` and `b` source directories.
-But with norman you should synchronize `app` module before running.
-Synchronizing `app` guarantees you have actual versions of all packages listed in norman config in `node_modules` of `app`.
-The layout of `app/node_modules` after sync matches the one you get by running `npm install` on production and fetching all dependencies by npm.
+norman пытается воспроизвести то, что получается после сборки модуля, его опубликования в npm-репозиторий и установки.
+Это не всегда возможно.
+Но он пытается.
 
-To sync a module, run `norman sync app`, where the last argument is either name of the module as specified in the config, or a path to the module source directory.
+# Как начать?
 
-You can use a watcher and synchronize a module on-the-fly by adding `--watch`: `norman sync --watch app`.
+1. Установить: `npm i -g node-norman`
+2. Создать файл `norman.json`, который перечисляет пакеты, которые мы будет разрабатывать (формат см. ниже)
+3. Запустить `norman fetch` в директории, где находится `norman.json` (или указать путь явно: `norman --config ~/project/.norman.json fetch`).
+4. Теперь norman склонирует модули с помощью git и установит их зависимости с помошью `npm install`.
 
-Note that norman does not rebuild local modules in watch mode, it only synchronizes changed files.
+После этого можно начинать работать.
+Чтобы синхронизировать все модули в проекте между собой, достаточно запустить `norman sync-all` в директории с `norman.json` или в любой дочерней директории.
+Можно синхронизировать только один модуль из проекта: `norman sync my-module`.
+`my-module` -- это имя модуля, которое указано в его `package.json`.
 
-But you can rebuild dependent modules on regular sync with `--build-deps` flag.
+Перед тем, как синхронизировать модули, norman запускает команды для сборки, которые указаны в файле `norman.json`.
 
-To sync all local modules at once, use `norman sync-all`.
+# Файл `.norman.json`
 
-# `.norman.json` file
+`modulesDirectory` (string, required): все модули в проекте будут клонироваться в указанную директорию.
+Если путь относительный, то он отсчитывается от директории, где находится конфиг.
 
-`modulesDirectory` (string, required): modules listed in `modules` are going to be cloned here by default.
+`includeModules` (string or string[]): путь к другому конфигу `norman.json` (может быть относительным по отношению к директории текущего конфига).
+Модули из этого конфига будут включены в текущий проект.
 
-`defaultBranch` (string): default git branch to use when cloning modules if branch is not specified in module config.
-Default is `master`.
+`defaultBranch`, `defaultBuildTriggers`, `defaultIgnoreScope`, `defaultNpmIgnore`, `defaultBuildCommands` -- значения соответстующих параметров для всех модулей в проекте, где эти параметры не указаны.
 
-`defaultIgnoreOrg` (boolean): if `false`, module `@myorg/repo` is going to be cloned (if `modulesDirectory` is `/home/user/my-project`) to `/home/user/myproject/myorg/repo`.
-If `true`, sources are going to be cloned to `/home/user/my-project/repo`.
-Default is `false`.
+`modules`: список модулей в проекте.
+Значение должно быть массивом объектов, где каждый объект имеет следующие свойства:
 
-`includeModules` (string or string[]): path (can be relative to the location of the current config file) to another config file.
-Modules from included configs are loaded too (taking into account `modulesDirectory` and other module-affecting options from included config).
+`module.repository` (string, required): URL репозитория.
 
-`defaultNpmIgnore` (string or boolean): by default, any files except those in `.git`, `.idea` and `node_modules` directories are synchronized into app's `node_modules`.
-If this option is `true`, `norman` looks for `.npmignore` file in each module and only synchronizes files not ignored by this file.
-If `false`, no attempt to use `.npmignore` is done.
-If it is a string, it specifies path to custom file with ignore rules.
-Default is `true`.
+`module.branch` (string): ветка git, которую нужно использовать для клонирования модуля.
+Дефолт -- `master`.
 
-`defaultNpmInstall` (boolean): if `true`, run `npm install` in all modules by default.
-Default is `true`.
+`module.path` (string): явно указывает путь к директории, куда будет клонироваться модуль.
+Путь может быть относительным по отношению к директории проекта.
 
-`defaultBuildTriggers` (string[]): list of glob patterns (parsed by minimatch module).
-When norman is called with `--build-deps` flag, a module is going to be rebuilt only on changes in files matching these patterns.
+`module.ignoreScope` (boolean): если `false`, то модуль `@myscope/repo` будет клонироваться в директорию `repo`, если `true` -- то в `myscope/repo` 
+Дефолт -- `false`.
 
-`modules`: list of modules to clone from git repositories.
-Each item should be an object, properties of these objects are documented below under `module.*` keys.
+`module.name` (string): имя модуля.
+По умолчанию, это имя будет получено из `package.json` после клонирования модуля.
 
-`module.name` (string): name of the package in npm registry.
-If not specified, the name is deducted from git url in `module.repository`.
-If git url is not specified, an error is raised.
+`module.npmIgnore` (string): указывает путь к файлу `.npmignore`, который по умолчанию будет использоваться для тех модулей, где нет своего файла `.npmignore`.
+Путь может быть относительным директории главного проекта.
+Дефолт -- не определено.
 
-`module.repository` (string): url to a repository to clone module from.
-If destination directory already exists, cloning is skipped.
+`module.buildTriggers` (string[]): список масок для файлов (используется minimatch).
+Пересборка модуля будет запускаться только в том случае, если в модуле изменился хотя бы один из файлов, подпадающих под одну из указанных здесь масок.
 
-`module.path` (string): overrides path to the cloned repository for the module (deducted by default from `modulesDirectory`).
-Path can be relative to the location of the current config file.
+`module.buildCommands` (string[]): список команд для сборки модуля.
+Каждая строка в массиве -- это либо имя npm-скрипта, либо shell-команда.
+Перед запуском проверяется, есть ли в `package.json` команда с таким именем.
 
-`module.ignoreOrg` (boolean): overrides value of `defaultIgnoreOrg` for the module.
+`module.useNpm` (boolean): если `false`, то модуль не будет синхронизироваться и не будет попыток управлять его зависимостями.
+По умолчанию `true`.
 
-`module.defaultBranch` (string): overrides value of `defaultBranch` for the module.
+## Поддержка source map
 
-`module.npmIgnore` (string): overrides value of `defaultNpmIgnore` value for the module.
+Когда файлы синхронизируются в модуль без локфайла, norman умеет автоматически изменять source map так, чтобы сохранить ссылки на оригинальные исходные файлы.
 
-`module.npmInstall` (boolean): overrides value of `npmInstall` for the module.
+## Обновление зависимостей
 
-`module.buildCommands` (string[]): commands to build the module after cloning it from the repository.
-Each command should be either a npm script or a shell command.
-Norman first checks if a npm script with the given name exists in `package.json` of the local module and if any, runs it.
-If the script is not found, it tries to run it as a shell command.
-Ignored if `npmInstall` for the module is `false`.
+Norman может помочь при обновлении зависимостей модулей.
+Чтобы показать неактуальные зависимости всех модулей проекта, запустите `norman outdated`.
+Чтобы обновить все зависимости всех модулей до версий, которые удовлетворяют указанным в `package.json` диапазонам версий, запустите `norman outdated --upgrade`.
+Чтобы обновить все зависимости всех модулей до самых новых версий, перезаписав диапазоны версий, запустите `norman outdated --upgrade --hard` (осторожно, все может сломаться).
 
-`module.buildTriggers' (string[]): overrides value of `defaultBuildTriggers` for the module.
+По умолчанию `norman outdated` не анализирует зависимости модулей, которые подключены из других проектов через `includeModules`.
+Чтобы анализировать все модули, используйте флаг `--with-included`.
 
-## Source map support
-
-Norman automatically modifies JS source maps to reference original source locations.
-
-## Keeping dependencies up to date
-
-Norman can help you keep dependencies in your project updated.
-To find outdated dependencies of all modules listed in config, run `norman outdated`.
-Run `norman outdated --upgrade` to upgrade all dependencies to newer versions that still match specified semver ranges.
-Run `norman outdated -upgrade --hard` to upgrade all dependencies to latest available versions (overwrites semver ranges in `package.json` and can easily break things).
-
-By default `outdated` command does not analyze modules included by `includeModules`.
-To include all modules, use `--with-included` flag.
-
-# Example config
+# Пример конфигурации
 
 ```json
 {
   "modulesDirectory": "/home/user/development/myproject",
-  "defaultBranch": "alpha",
-  "defaultIgnoreOrg": true,
   "defaultBuildTriggers": [ "*.ts", "tsconfig.json", "package.json", "webpack.config.js" ],
   "modules": [
     {
@@ -123,13 +110,16 @@ To include all modules, use `--with-included` flag.
 }
 ```
 
-# Troubleshooting
+# Решение проблем
 
-Norman uses local NPM registry server internally that dynamically builds and packs local modules.
-This server acts as a proxy to original npm registries and caches fetched tarballs.
-If you have any problems with these cached tarballs, run `norman clean cache`.
+Norman использует локальный npm-сервер.
+Поскольку при переустановке зависимостей, когда версия зависимости не изменилась `npm` будет пытаться не делать запроса к репозиторию и устанавливать модуль из локального кеша, norman приходится инвалидировать кеш перед установкой зависимостей.
+По этой причине необходимо, чтобы текущий пользователь имел достаточно прав, чтобы выполнить команду `npm cache clean`.
 
-Norman also stores snapshots of local module state in `~/.norman-state` directory to determine whether it should repack or rebuild requested local module.
-You can clean stored state by running `norman clean state`.
+Кроме того, чтобы после каждой инвалидации кеша `npm` не приходилось загружать модули из реального реестра, norman управляет собственным кешем зависимостей, загруженных с других репозиториев.
+Чтобы очистить этот кеш, можно использовать команду `norman clean cache`.
 
-To clean everything including temp files with packed versions of local modules, run `norman clean all`.
+Информация о состоянии исходных файлов модулей, которая используется для определения необходимости пересборки модулей, хранится в директории `~/.norman-state`.
+Эти данные можно удалить командой `norman clean state`.
+
+Чтобы удалить все, включая временные файлы, которые создаются при упаковке модулей, можно использовать команду `norman clean all`.

@@ -2,8 +2,8 @@ import * as fs from "fs-extra";
 import * as path from "path";
 import { resolveRegistryUrl } from "./registry-paths";
 import { getConfig } from "./config";
-import { getPackager} from "./module-packager";
-import { ModuleInfo } from "./module-info";
+import { LocalModule } from "./local-module";
+import { getPublisher } from "./ModulePublisher";
 
 
 const LOCKFILE_NAME = "package-lock.json";
@@ -47,13 +47,18 @@ export class Lockfile {
   }
 
 
-  public static forModule(module: ModuleInfo) {
+  public static forModule(module: LocalModule) {
     return new Lockfile(this.getPathForDir(module.path));
   }
 
 
   public static existsInDir(dir: string) {
     return fs.existsSync(this.getPathForDir(dir));
+  }
+
+
+  public static existsInModule(mod: LocalModule) {
+    return this.existsInDir(mod.path);
   }
 
 
@@ -75,7 +80,7 @@ export class Lockfile {
         return;
       }
 
-      dep.integrity = getPackager().getPrepackagedArchiveIntegrity(localModule);
+      dep.integrity = getPublisher().getPublishedTarballIntegrity(localModule);
     });
   }
 

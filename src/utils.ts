@@ -21,11 +21,11 @@ export async function runCommand(command: string, args: string[] | null, options
     let silent = options && options.silent === true;
 
     if (!silent) {
-      let inClause = options && options.cwd ? `(in ${ options.cwd })` : "";
+      let inClause = options && options.cwd ? `(in ${options.cwd})` : "";
       if (args == null) {
-        console.log(chalk.cyan(`→ ${ command } ${ inClause }`));
+        console.log(chalk.cyan(`→ ${command} ${inClause}`));
       } else {
-        console.log(chalk.cyan(`→ ${ command } ${ args.join(" ") } ${ inClause }`));
+        console.log(chalk.cyan(`→ ${command} ${args.join(" ")} ${inClause}`));
       }
     }
 
@@ -61,13 +61,13 @@ export async function runCommand(command: string, args: string[] | null, options
       } else {
         logProcessExecuteError(code, command, args, options);
 
-        reject(new Error(`Process exited with code ${ code }`));
+        reject(new Error(`Process exited with code ${code}`));
       }
     });
 
     proc.on("error", error => {
       if (!silent) {
-        console.log(chalk.red(`→ ERROR: ${ error.message }`));
+        console.log(chalk.red(`→ ERROR: ${error.message}`));
       }
       reject(error);
     });
@@ -81,7 +81,7 @@ function logProcessExecuteError(exitCode: number, command: string, args: null | 
     console.log(chalk.redBright("  " + command));
   } else {
     const commandParams = args.join(" ");
-    console.log(chalk.redBright(`  ${ command } ${ commandParams }`));
+    console.log(chalk.redBright(`  ${command} ${commandParams}`));
   }
 
   if (options && options.cwd) {
@@ -90,7 +90,7 @@ function logProcessExecuteError(exitCode: number, command: string, args: null | 
 
   if (exitCode === 127) {
     if (args == null) {
-      console.log(chalk.red(`Please make sure executable exists, or, in case or running npm script, make sure that script ${ command } exists`));
+      console.log(chalk.red(`Please make sure executable exists, or, in case or running npm script, make sure that script ${command} exists`));
     } else {
       console.log(chalk.red("Please make sure executable exists"));
     }
@@ -99,7 +99,7 @@ function logProcessExecuteError(exitCode: number, command: string, args: null | 
 
 
 export async function cleanNpmCache(): Promise<void> {
-  await runCommand(getNpmExecutable(), [ "cache", "clean", "--force" ], {
+  await runCommand(getNpmExecutable(), ["cache", "clean", "--force"], {
     silent: true
   });
 }
@@ -107,7 +107,7 @@ export async function cleanNpmCache(): Promise<void> {
 
 export function getDirectDeps(packagePath: string, includeDev: boolean = true): string[] {
   let pkgPath = path.join(packagePath, "package.json");
-  let pkg = fs.readJSONSync(pkgPath, { encoding: "utf-8" });
+  let pkg = fs.readJSONSync(pkgPath, {encoding: "utf-8"});
   let deps = Object.keys(pkg.dependencies || {});
   if (includeDev) {
     deps = deps.concat(Object.keys(pkg.devDependencies || {}));

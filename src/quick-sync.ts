@@ -1,16 +1,16 @@
 import * as fs from "fs-extra";
 import * as path from "path";
 import * as chalk from "chalk";
-import { ModuleInfo } from "./module-info";
+import { LocalModule } from "./local-module";
 import * as utils from "./utils";
-import { PublishDependenciesSubset } from "./publish-dependencies-subset";
+import { PublishDependenciesSubset } from "./subsets/publish-dependencies-subset";
 
 
 /**
  * Performs quick synchronization (without using npm) of files in `from` module inside `to` module.
  */
-export async function quickSync(from: ModuleInfo, to: ModuleInfo): Promise<void> {
-  let syncTarget = path.join(to.path, "node_modules", from.npmName.name);
+export async function quickSync(from: LocalModule, to: LocalModule): Promise<void> {
+  let syncTarget = path.join(to.path, "node_modules", from.checkedName.name);
   if (utils.isSymlink(syncTarget)) {
     console.log(chalk.yellow(`Skipping sync into "${ syncTarget }" because it is a linked dependency`));
     return;
@@ -30,16 +30,11 @@ export async function quickSync(from: ModuleInfo, to: ModuleInfo): Promise<void>
 /**
  * Finds files that should be copied from source directory to target
  */
-export async function quickSyncCopy(from: ModuleInfo, to: string): Promise<number> {
+export async function quickSyncCopy(from: LocalModule, to: string): Promise<number> {
   let filesCopied = 0;
 
-  const publishSubset = new PublishDependenciesSubset();
-
-  await from.walkModuleFiles(async (filename: string, stat: fs.Stats) => {
-    if (!publishSubset.isFileIncluded(from, filename)) {
-      return;
-    }
-
+  const publishSubset = new PublishDependenciesSubset(from);
+  await publishSubset.walk(async (filename: string, stat: fs.Stats) => {
     let target = path.join(to, path.relative(from.path, filename));
 
     let isCopied: boolean;
@@ -58,7 +53,7 @@ export async function quickSyncCopy(from: ModuleInfo, to: string): Promise<numbe
 }
 
 
-async function quickSyncFile(from: ModuleInfo, source: string, sourceStat: fs.Stats, target: string): Promise<boolean> {
+async function quickSyncFile(from: LocalModule, source: string, sourceStat: fs.Stats, target: string): Promise<boolean> {
   try {
     const targetStat = fs.statSync(target);
 
@@ -113,16 +108,16 @@ async function quickSyncDirectory(source: string, target: string): Promise<boole
 }
 
 
-async function quickSyncRemove(from: ModuleInfo, to: string): Promise<number> {
+async function quickSyncRemove(from: LocalModule, to: string): Promise<number> {
   let filesToRemove: [ string, fs.Stats ][] = [];
 
-  const publishSubset = new PublishDependenciesSubset();
+  const publishSubset = new PublishDependenciesSubset(from, to);
 
   await utils.walkDirectoryFiles(to, async (filename, stat) => {
     let relpath = path.relative(to, filename);
 
     let sourceFilename = path.join(from.path, relpath);
-    if (!fs.existsSync(sourceFilename) || !publishSubset.isFileIncluded(from, sourceFilename)) {
+    if (!fs.existsSync(sourceFilename) || !publishSubset.isFileIncluded(sourceFilename)) {
       filesToRemove.push([ filename, stat ]);
     }
   });
