@@ -1,8 +1,7 @@
-import {Config} from "./config";
+import {Project} from "./project";
 import * as path from "path";
 import * as fs from "fs-extra";
 import ignore, {Ignore} from "ignore";
-import {getPluginManager} from "./plugins";
 import gitUrlParse = require("git-url-parse");
 
 
@@ -75,7 +74,15 @@ export class LocalModule {
   }
 
 
-  public static createFromConfig(rawConfig: RawModuleConfig, appConfig: Config, isFromMainProject: boolean, configDir: string): LocalModule {
+  public reloadInfo() {
+    let rawName = LocalModule.tryReadPackageName(this.path);
+    if (rawName) {
+      this._config.name = npmNameFromPackageName(rawName);
+    }
+  }
+
+
+  public static createFromConfig(rawConfig: RawModuleConfig, appConfig: Project, isFromMainProject: boolean, configDir: string): LocalModule {
     let repository: string;
     if ("repository" in rawConfig) {
       if (typeof rawConfig.repository !== "string") {
@@ -170,24 +177,24 @@ export class LocalModule {
 
     return new LocalModule({
       repository,
-      name: name,
+      name,
       buildCommands,
       branch,
       path: modulePath,
-      ignoreScope: ignoreScope,
+      ignoreScope,
       npmIgnorePath,
-      useNpm: useNpm,
+      useNpm,
       isFromMainProject,
       buildTriggers
     });
   }
 
 
-  private static resolveIgnoreFromHint(ignorePath: string | undefined, appConfig: Config): string | undefined {
+  private static resolveIgnoreFromHint(ignorePath: string | undefined, appConfig: Project): string | undefined {
     let npmIgnorePath: string | undefined;
     if (ignorePath) {
       if (!path.isAbsolute(ignorePath)) {
-        npmIgnorePath = path.resolve(appConfig.mainConfigDir, ignorePath);
+        npmIgnorePath = path.resolve(appConfig.mainProjectDir, ignorePath);
       } else {
         npmIgnorePath = ignorePath;
       }
@@ -230,25 +237,15 @@ export class LocalModule {
   }
 
 
-  public async copyFile(source: string, target: string, isExecutable: boolean = false): Promise<void> {
-    // here we always copy a file by loading it into memory because fs.copyFile has problems on VirtualBox shared folders
-
-    const saveFile = () => {
-      // tslint:disable-next-line no-bitwise
-      fs.writeFileSync(target, fileContent, {mode: (isExecutable ? 0o0100 : 0) | 0o666});
-    };
-
-    let fileContent = fs.readFileSync(source);
-
-    for (let plugin of getPluginManager().plugins) {
-      if (plugin.matches(this, source)) {
-        fileContent = await plugin.process(this, source, fileContent);
-        saveFile();
-        return;
+  public get outsideIgnoreFilePath() {
+    if (this.config.npmIgnorePath) {
+      let relativePath = path.relative(this.path, this.config.npmIgnorePath);
+      if (relativePath !== ".npmignore") {
+        return this.config.npmIgnorePath;
       }
     }
 
-    saveFile();
+    return undefined;
   }
 
 

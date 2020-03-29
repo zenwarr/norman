@@ -16,6 +16,10 @@ export class ServiceLocator {
     return service as T;
   }
 
+  public getIfExists<T>(name: string): T | undefined {
+    return this._services.get(name) as T | undefined;
+  }
+
   public static get instance() {
     return this._instance;
   }

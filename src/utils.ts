@@ -98,13 +98,6 @@ function logProcessExecuteError(exitCode: number, command: string, args: null | 
 }
 
 
-export async function cleanNpmCache(): Promise<void> {
-  await runCommand(getNpmExecutable(), ["cache", "clean", "--force"], {
-    silent: true
-  });
-}
-
-
 export function getDirectDeps(packagePath: string, includeDev: boolean = true): string[] {
   let pkgPath = path.join(packagePath, "package.json");
   let pkg = fs.readJSONSync(pkgPath, {encoding: "utf-8"});
@@ -114,65 +107,6 @@ export function getDirectDeps(packagePath: string, includeDev: boolean = true): 
   }
 
   return deps;
-}
-
-
-export async function walkDirectoryFiles(startDir: string, walker: (filename: string, stat: fs.Stats) => Promise<void>): Promise<void> {
-  const handle = async(filename: string) => {
-    let stat: fs.Stats;
-
-    try {
-      stat = fs.statSync(filename);
-    } catch (error) {
-      return;
-    }
-
-    await walker(filename, stat);
-
-    if (stat.isDirectory()) {
-      let items = fs.readdirSync(filename);
-      for (let item of items) {
-        await handle(path.join(filename, item));
-      }
-    }
-  };
-
-  await handle(startDir);
-}
-
-
-export function getRidOfIt(filename: string): void {
-  let stat: fs.Stats;
-
-  try {
-    stat = fs.lstatSync(filename);
-  } catch (error) {
-    if (error.code === "ENOENT") {
-      return;
-    }
-    throw error;
-  }
-
-  (stat.isDirectory() ? fs.rmdirSync : fs.unlinkSync)(filename);
-}
-
-
-export function hasExecPermission(filename: string): boolean {
-  if (process.platform === "win32") {
-    return false;
-  } else {
-    try {
-      fs.accessSync(filename, fs.constants.X_OK);
-      return true;
-    } catch (error) {
-      return false;
-    }
-  }
-}
-
-
-export function isSymlink(filename: string): boolean {
-  return fs.lstatSync(filename).isSymbolicLink();
 }
 
 

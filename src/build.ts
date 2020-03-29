@@ -10,10 +10,10 @@ export async function buildModuleIfChanged(mod: LocalModule) {
   const stateManager = getStateManager();
 
   const subset = new BuildDependenciesSubset(mod);
-  if (await stateManager.isSubsetChanged(mod, subset)) {
+  if (await stateManager.isSubsetChanged(mod, subset.getName(), subset)) {
     await buildModule(mod);
 
-    stateManager.saveState(mod, await stateManager.getActualState(mod));
+    stateManager.saveState(mod, subset.getName(), await stateManager.getActualState(mod));
 
     return true;
   }

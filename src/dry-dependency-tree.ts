@@ -1,6 +1,6 @@
 import { LocalModule } from "./local-module";
 import * as utils from "./utils";
-import { getConfig } from "./config";
+import { getProject } from "./project";
 
 
 export enum WalkerAction {
@@ -21,8 +21,32 @@ export function getDirectLocalDeps(module: LocalModule): LocalModule[] {
     return [];
   }
 
-  const config = getConfig();
+  const config = getProject();
   return utils.getDirectDeps(module.path).map(moduleName => config.getModuleInfo(moduleName)).filter(dep => dep != null) as LocalModule[];
+}
+
+
+export async function walkModuleDependants(mod: LocalModule, walker: (dep: LocalModule) => Promise<void>, walked?: Set<LocalModule>): Promise<void> {
+  let config = getProject();
+
+  let dependants: LocalModule[] = [];
+
+  if (!walked) {
+    walked = new Set<LocalModule>();
+  }
+
+  for (let anotherMod of config.modules) {
+    let directDeps = getDirectLocalDeps(anotherMod);
+    if (directDeps.includes(mod) && (!walked || !walked.has(anotherMod))) {
+      await walker(anotherMod);
+      walked.add(anotherMod);
+      dependants.push(anotherMod);
+    }
+  }
+
+  for (let dep of dependants) {
+    await walkModuleDependants(dep, walker, walked);
+  }
 }
 
 
@@ -64,13 +88,7 @@ export async function walkDryLocalTreeFromMultipleRoots(modules: LocalModule[], 
 
 
 export async function walkAllLocalModules(walker: LocalModuleWalker): Promise<void> {
-  return walkDryLocalTreeFromMultipleRoots(getConfig().modules, walker);
+  return walkDryLocalTreeFromMultipleRoots(getProject().modules, walker);
 }
 
 
-/**
- * Walks dependency tree of the given module in bottom-up order.
- */
-export async function walkDependencyTree(module: LocalModule, walker: LocalModuleWalker): Promise<void> {
-  return walkDryLocalTreeFromMultipleRoots([ module ], walker);
-}

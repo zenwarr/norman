@@ -1,5 +1,5 @@
 import * as chalk from "chalk";
-import { Config } from "./config";
+import { Project } from "./project";
 import { listModulesCommand } from "./commands/list-modules";
 import { dependencyTreeCommand } from "./commands/dependency-tree";
 import { fetchCommand } from "./commands/fetch";
@@ -7,24 +7,28 @@ import { syncCommand } from "./commands/sync";
 import { cleanCommand } from "./commands/clean";
 import { syncAllCommand } from "./commands/sync-all";
 import { ArgumentsManager, getArgs } from "./arguments";
-import { PluginManager } from "./plugins";
 import { NpmRC } from "./npmrc";
 import { ModuleStateManager } from "./module-state-manager";
 import { npmCommand } from "./commands/npm";
-import { ModulePublisher } from "./ModulePublisher";
 import { outdatedCommand } from "./upgrade/outdated-command";
 import { publishCommand } from "./commands/publish";
+import { NpmRegistry } from "./registry";
+import { ServiceLocator } from "./locator";
+import { Config } from "./config/config";
+import { startServerCommand } from "./commands/server";
 
 
 async function asyncStart(): Promise<void> {
   ArgumentsManager.init();
   Config.init();
   NpmRC.init();
-  PluginManager.init();
-  ModuleStateManager.init();
-  ModulePublisher.init();
 
   let args = getArgs();
+
+  if (args.subCommand !== "server") {
+    Project.init();
+    ModuleStateManager.init();
+  }
 
   const COMMANDS: { [name: string]: () => Promise<void> | void } = {
     "list-modules": listModulesCommand,
@@ -35,7 +39,8 @@ async function asyncStart(): Promise<void> {
     "sync-all": syncAllCommand,
     outdated: outdatedCommand,
     npm: npmCommand,
-    publish: publishCommand
+    publish: publishCommand,
+    server: startServerCommand
   };
 
   const command = COMMANDS[args.subCommand];
@@ -54,3 +59,28 @@ export function start(): void {
     process.exit(-1);
   });
 }
+
+
+function shutdown() {
+  let server = ServiceLocator.instance.getIfExists<NpmRegistry>("server");
+  if (server) {
+    server.stop();
+  }
+}
+
+
+process.on("exit", () => {
+  shutdown();
+});
+
+
+process.on("unhandledRejection", (error: unknown) => {
+  console.error(chalk.red("Unhandled rejection"), error);
+  process.exit(-1);
+});
+
+
+process.on("uncaughtException", (error: Error) => {
+  console.error(chalk.red("Uncaught exception"), error);
+  process.exit(-1);
+});

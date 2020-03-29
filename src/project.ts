@@ -21,8 +21,8 @@ interface RawConfig {
 }
 
 
-interface ConfigInit {
-  mainConfigDir: string;
+interface ProjectConfigInit {
+  mainProjectDir: string;
   mainModulesDir: string;
   defaultIgnoreScope: boolean;
   defaultNpmIgnorePath: string | undefined;
@@ -32,42 +32,38 @@ interface ConfigInit {
 }
 
 
-export class Config {
+export class Project {
   private _modules: LocalModule[] = [];
 
-  public get mainConfigDir() {
-    return this._config.mainConfigDir;
-  }
-
-  public get mainModulesDir() {
-    return this._config.mainModulesDir;
+  public get mainProjectDir() {
+    return this._project.mainProjectDir;
   }
 
   public get defaultBranch() {
-    return this._config.defaultBranch;
+    return this._project.defaultBranch;
   }
 
   public get defaultIgnoreScope() {
-    return this._config.defaultIgnoreScope;
+    return this._project.defaultIgnoreScope;
   }
 
   public get defaultNpmIgnore() {
-    return this._config.defaultNpmIgnorePath;
+    return this._project.defaultNpmIgnorePath;
   }
 
   public get defaultUseNpm() {
-    return this._config.defaultUseNpm;
+    return this._project.defaultUseNpm;
   }
 
   public get defaultBuildTriggers() {
-    return this._config.defaultBuildTriggers;
+    return this._project.defaultBuildTriggers;
   }
 
   public get modules() {
     return this._modules;
   }
 
-  protected constructor(private _config: ConfigInit) {
+  protected constructor(private _project: ProjectConfigInit) {
 
   }
 
@@ -77,8 +73,8 @@ export class Config {
   }
 
 
-  public static loadConfig(configFilename: string, rawConfig: RawConfig, isMainConfig: boolean, ignoreMissing: boolean): Config {
-    let mainConfigDir = path.dirname(configFilename);
+  public static loadProject(projectFilename: string, rawConfig: RawConfig, isMainConfig: boolean, ignoreMissing: boolean): Project {
+    let mainProjectDir = path.dirname(projectFilename);
 
     let mainModulesDir: string;
     if ("modulesDirectory" in rawConfig) {
@@ -86,7 +82,7 @@ export class Config {
         throw new Error("'modulesDirectory' should be a string");
       }
       if (!path.isAbsolute(rawConfig.modulesDirectory)) {
-        mainModulesDir = path.resolve(mainConfigDir, rawConfig.modulesDirectory);
+        mainModulesDir = path.resolve(mainProjectDir, rawConfig.modulesDirectory);
       } else {
         mainModulesDir = rawConfig.modulesDirectory;
       }
@@ -134,30 +130,30 @@ export class Config {
       defaultBuildTriggers = rawConfig.defaultBuildTriggers;
     }
 
-    let appConfig = new Config({
-      mainConfigDir,
+    let appConfig = new Project({
+      mainProjectDir,
       mainModulesDir,
-      defaultIgnoreScope: defaultIgnoreScope,
+      defaultIgnoreScope,
       defaultNpmIgnorePath,
       defaultBranch,
-      defaultUseNpm: defaultUseNpm,
-      defaultBuildTriggers: defaultBuildTriggers
+      defaultUseNpm,
+      defaultBuildTriggers
     });
 
-    appConfig._modules = this.loadModules(configFilename, rawConfig, appConfig, isMainConfig, ignoreMissing);
+    appConfig._modules = this.loadModules(projectFilename, rawConfig, appConfig, isMainConfig, ignoreMissing);
 
     return appConfig;
   }
 
 
-  private static loadModules(configFilename: string, rawConfig: RawConfig, appConfig: Config, isMainConfig: boolean, ignoreMissing: boolean): LocalModule[] {
+  private static loadModules(configFilename: string, rawConfig: RawConfig, appConfig: Project, isMainConfig: boolean, ignoreMissing: boolean): LocalModule[] {
     let configDir = path.dirname(configFilename);
 
     let modules: LocalModule[] = [];
     if ("includeModules" in rawConfig) {
       let includeModules: unknown[] = [];
       if (typeof rawConfig.includeModules === "string") {
-        includeModules = [ rawConfig.includeModules ]
+        includeModules = [ rawConfig.includeModules ];
       } else if (Array.isArray(rawConfig.includeModules)) {
         includeModules = rawConfig.includeModules as string[];
       } else {
@@ -192,7 +188,7 @@ export class Config {
         }
 
         try {
-          let config = Config.loadConfigFromFile(configPath, false, ignoreMissing);
+          let config = Project.loadConfigFromFile(configPath, false, ignoreMissing);
 
           let extraModules = config._modules.filter(extraModule => !modules.find(module => module.name === extraModule.name));
 
@@ -221,7 +217,7 @@ export class Config {
   }
 
 
-  public static findAndLoadConfig(startDir: string, ignoreMissing: boolean): Config {
+  public static findAndLoadProject(startDir: string, ignoreMissing: boolean): Project {
     const findConfigForDir = (dir: string): string => {
       if (!dir || dir === "/" || dir === ".") {
         throw new Error(`No ${ CONFIG_FILE_NAME } found in directory tree`);
@@ -239,13 +235,13 @@ export class Config {
   }
 
 
-  public static loadConfigFromFile(filename: string, isMainConfig: boolean, ignoreMissing: boolean): Config {
+  public static loadConfigFromFile(filename: string, isMainConfig: boolean, ignoreMissing: boolean): Project {
     let rawConfig = fs.readFileSync(filename, {
       encoding: "utf-8"
     });
 
     try {
-      return this.loadConfig(filename, JSON.parse(rawConfig), isMainConfig, ignoreMissing);
+      return this.loadProject(filename, JSON.parse(rawConfig), isMainConfig, ignoreMissing);
     } catch (error) {
       // invalid config, stop here
       throw new Error(`Invalid config file ${ filename }: ${ error.message }`);
@@ -255,13 +251,18 @@ export class Config {
 
   public static init() {
     const args = getArgs();
-    const config = Config.findAndLoadConfig(args.config || process.cwd(), args.ignoreMissingIncludedModules);
-    ServiceLocator.instance.initialize("config", config);
+    const config = Project.findAndLoadProject(args.config || process.cwd(), args.ignoreMissingIncludedModules);
+    ServiceLocator.instance.initialize("project", config);
   }
 }
 
 
 
-export function getConfig() {
-  return ServiceLocator.instance.get<Config>("config");
+export function getProject() {
+  return ServiceLocator.instance.get<Project>("project");
+}
+
+
+export function getProjectIfExists() {
+  return ServiceLocator.instance.getIfExists<Project>("project");
 }

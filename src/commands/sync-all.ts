@@ -1,8 +1,6 @@
-import { getServer, LocalNpmServer } from "../server";
-import { ModuleSynchronizer } from "../module-synchronizer";
+import { getRegistry, NpmRegistry } from "../registry";
 import { getArgs } from "../arguments";
 import { walkAllLocalModules } from "../dry-dependency-tree";
-import { getConfig } from "../config";
 import {fetchLocalModule} from "../fetch";
 import {installModuleDepsIfNotInitialized} from "../deps";
 
@@ -14,15 +12,13 @@ export async function syncAllCommand() {
     return;
   }
 
-  await LocalNpmServer.init();
+  await NpmRegistry.init();
 
   try {
     await walkAllLocalModules(async module => fetchLocalModule(module));
 
     await walkAllLocalModules(async module => installModuleDepsIfNotInitialized(module));
-
-    await ModuleSynchronizer.syncRoots(getConfig().modules, true);
   } finally {
-    await getServer().stop();
+    getRegistry().stop();
   }
 }

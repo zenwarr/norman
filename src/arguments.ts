@@ -8,7 +8,6 @@ export type Arguments = {
   ignoreMissingIncludedModules: boolean;
 } & ({
   subCommand: "sync";
-  path: string;
 } | {
   subCommand: "sync-all";
 } | {
@@ -27,10 +26,12 @@ export type Arguments = {
   hard: boolean;
   withIncluded: boolean;
 } | {
-  subCommand: "npm",
-  args: string[]
+  subCommand: "npm";
+  args: string[];
 } | {
-  subCommand: "publish"
+  subCommand: "publish";
+} | {
+  subCommand: "server";
 });
 
 
@@ -58,8 +59,7 @@ export class ArgumentsManager {
       dest: "subCommand"
     });
 
-    let syncParser = subparsers.addParser("sync", { help: "Synchronizes a local module" });
-    syncParser.addArgument("path", { help: "Path to module to synchronize" });
+    subparsers.addParser("sync", { help: "Synchronizes a local module at current working directory" });
 
     subparsers.addParser("sync-all", { help: "Synchronize all local modules" });
 
@@ -79,7 +79,6 @@ export class ArgumentsManager {
       title: "What to clean",
       dest: "cleanWhat"
     });
-    cleanSubparsers.addParser("cache", { help: "Clean local NPM server cache" });
     cleanSubparsers.addParser("state", { help: "Clean saved local modules state" });
     cleanSubparsers.addParser("all", { help: "Clean local NPM server cache, saved local modules cache and temp files" });
 
@@ -111,6 +110,8 @@ export class ArgumentsManager {
     });
 
     subparsers.addParser("publish", { help: "Publish module" });
+
+    subparsers.addParser("server", { help: "Start local npm registry server" });
 
     let args: Arguments = argparser.parseArgs();
     this._args = args;

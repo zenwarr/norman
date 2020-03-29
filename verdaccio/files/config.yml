@@ -1,0 +1,45 @@
+# path to a directory with all packages
+storage: /home/victor/.local/share/verdaccio/storage
+# path to a directory with plugins to include
+plugins: ./plugins
+
+web:
+  title: Verdaccio
+
+auth:
+  htpasswd:
+    file: ./htpasswd
+    max_users: -1
+
+uplinks:
+  npmjs:
+    url: https://registry.npmjs.org/
+
+  swaxis_alpha:
+    url: https://npm-alpha.swaxis.com/
+    auth:
+      type: bearer
+      token: "pWQdwVRek3JRnOErNKOzSWJBn6Qm0lOEokwJRR7Pcpw="
+
+packages:
+  '@*/*':
+    # scoped packages
+    access: $all
+    publish: $all
+    unpublish: $all
+    proxy:
+      - npmrc
+      - swaxis_alpha
+
+  '**':
+    access: $all
+    publish: $all
+    unpublish: $all
+    proxy: npmjs
+
+server:
+  keepAliveTimeout: 60
+
+middlewares:
+  audit:
+    enabled: true

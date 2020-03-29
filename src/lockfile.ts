@@ -1,9 +1,7 @@
 import * as fs from "fs-extra";
 import * as path from "path";
 import { resolveRegistryUrl } from "./registry-paths";
-import { getConfig } from "./config";
 import { LocalModule } from "./local-module";
-import { getPublisher } from "./ModulePublisher";
 
 
 const LOCKFILE_NAME = "package-lock.json";
@@ -68,37 +66,6 @@ export class Lockfile {
         dep.resolved = resolveRegistryUrl(dep.resolved, dep.version);
       }
     });
-  }
-
-
-  public updateIntegrity() {
-    const config = getConfig();
-
-    this.mutateDependencies((dep, name) => {
-      const localModule = config.getModuleInfo(name);
-      if (!localModule) {
-        return;
-      }
-
-      dep.integrity = getPublisher().getPublishedTarballIntegrity(localModule);
-    });
-  }
-
-
-  public async getDepIntegrity(npmName: string): Promise<string | undefined> {
-    const content = this.load();
-
-    if (!content.dependencies) {
-      return undefined;
-    }
-
-    for (const depName of Object.keys(content.dependencies)) {
-      if (depName === npmName) {
-        return content.dependencies[depName].integrity;
-      }
-    }
-
-    return undefined;
   }
 
 

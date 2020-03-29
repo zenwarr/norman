@@ -5,7 +5,7 @@ import * as ini from "ini";
 import * as url from "url";
 import * as path from "path";
 import * as os from "os";
-import { getConfig } from "./config";
+import { getProject, getProjectIfExists } from "./project";
 
 
 export type NpmConfig = {
@@ -19,13 +19,22 @@ const NPMRC_FILENAME = ".npmrc";
 const DEFAULT_NPM_REGISTRY = "https://registry.npmjs.org/";
 
 
+function emptyNpmConfig() {
+  return {
+    registries: {},
+    tokens: {},
+    other: {}
+  };
+}
+
+
 export class NpmRC {
   private _npmrc: NpmConfig;
 
 
   public constructor() {
-    const config = getConfig();
-    this._npmrc = this.load(config.mainConfigDir);
+    const config = getProjectIfExists();
+    this._npmrc = this.load(config ? config.mainProjectDir : undefined);
   }
 
 
@@ -44,12 +53,13 @@ export class NpmRC {
   }
 
 
-  public getTokenForHost(host: string): string | undefined {
-    return this._npmrc.tokens[host];
+  public getTokenForRegistry(registry: string): string {
+    let hostname = new url.URL(registry).hostname;
+    return this._npmrc.tokens[hostname];
   }
 
 
-  protected load(dir: string): NpmConfig {
+  protected load(dir?: string): NpmConfig {
     const loadNpmrc = (filename: string): NpmConfig => {
       let npmrcText = "";
       try {
@@ -96,7 +106,13 @@ export class NpmRC {
       return npmConfig;
     };
 
-    let projectConfig = loadNpmrc(path.join(dir, NPMRC_FILENAME));
+    let projectConfig: NpmConfig;
+    if (dir) {
+      projectConfig = loadNpmrc(path.join(dir, NPMRC_FILENAME));
+    } else {
+      projectConfig = emptyNpmConfig();
+    }
+
     let profileConfig = loadNpmrc(path.join(os.homedir(), NPMRC_FILENAME));
 
     if (!projectConfig.registries.default && !profileConfig.registries.default) {

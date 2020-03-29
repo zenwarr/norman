@@ -1,10 +1,10 @@
-import { getConfig } from "../config";
+import { getProject } from "../project";
 import * as columnify from "columnify";
 import { getRegistryForModule } from "../registry-paths";
 
 
 export async function listModulesCommand() {
-  const config = getConfig();
+  const config = getProject();
 
   const data = config.modules.map(module => ({
     name: module.name ? module.name.name : "<no name>",

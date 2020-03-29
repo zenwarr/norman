@@ -1,5 +1,5 @@
 import * as url from "url";
-import { getConfig } from "./config";
+import { getProject } from "./project";
 import { getNpmRc } from "./npmrc";
 import { LocalModule, ModuleNpmName } from "./local-module";
 
@@ -23,7 +23,7 @@ export function resolveRegistryUrl(proxyUrl: string, version: string): string {
 
 
 export function resolveRemoteTarballForLocalModule(moduleName: string, version: string): string {
-  const config = getConfig();
+  const config = getProject();
   const module = config.getModuleInfo(moduleName);
   if (!module) {
     throw new Error(`Failed to resolve remote tarball URL for local module "${ moduleName }": local module not found`);

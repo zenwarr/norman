@@ -1,7 +1,7 @@
 import { getArgs } from "../arguments";
-import { getConfig } from "../config";
+import { getProject } from "../project";
 import { NpmRunner } from "../module-npm-runner";
-import { getServer, LocalNpmServer } from "../server";
+import { getRegistry, NpmRegistry } from "../registry";
 
 
 export async function npmCommand() {
@@ -10,7 +10,7 @@ export async function npmCommand() {
     return;
   }
 
-  let config = getConfig();
+  let config = getProject();
 
   let dir = process.cwd();
 
@@ -19,11 +19,11 @@ export async function npmCommand() {
     throw new Error(`Failed to find local module at current working directory ("${ dir }")`);
   }
 
-  await LocalNpmServer.init();
+  await NpmRegistry.init();
 
   try {
     await NpmRunner.run(mod, args.args);
   } finally {
-    await getServer().stop();
+    getRegistry().stop();
   }
 }

@@ -13,6 +13,12 @@ export class PublishDependenciesSubset extends ModuleSubset {
 
 
   public async isFileIncluded(filename: string): Promise<boolean> {
+    let relpath = path.relative(this.mod.path, filename);
+    if (relpath === ".npmignore" || relpath === ".gitignore") {
+      // this files are not actually published, but they affect list of files to be published
+      return true;
+    }
+
     let list: string[];
 
     if (!PublishDependenciesSubset._packListCache.has(this.dirPath)) {
@@ -26,7 +32,7 @@ export class PublishDependenciesSubset extends ModuleSubset {
 
     const inPackList = list.includes(filename);
     if (inPackList && this.mod.customIgnoreInstance) {
-      return !this.mod.customIgnoreInstance.ignores(filename);
+      return !this.mod.customIgnoreInstance.ignores(relpath);
     }
 
     return inPackList;

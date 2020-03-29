@@ -1,19 +1,19 @@
-import { getServer, LocalNpmServer } from "../server";
+import { getRegistry, NpmRegistry } from "../registry";
 import * as chalk from "chalk";
 import { getArgs } from "../arguments";
-import { getConfig } from "../config";
+import { getProject } from "../project";
 import { getOutdated, upgradeDependency } from "./upgrade";
 
 
 export async function outdatedCommand() {
   let args = getArgs();
-  let config = getConfig();
+  let config = getProject();
 
   if (args.subCommand !== "outdated") {
     return;
   }
 
-  await LocalNpmServer.init();
+  await NpmRegistry.init();
 
   try {
     let results: any = {};
@@ -37,7 +37,7 @@ export async function outdatedCommand() {
       await upgradeModules(results, args.hard);
     }
   } finally {
-    await getServer().stop();
+    getRegistry().stop();
   }
 }
 
@@ -80,7 +80,7 @@ function buildOutdatedReport(outdatedData: any): string {
 
 
 async function upgradeModules(outdatedData: any, hard: boolean): Promise<void> {
-  const config = getConfig();
+  const config = getProject();
 
   for (let mod of config.modules) {
     if (!mod.name) {

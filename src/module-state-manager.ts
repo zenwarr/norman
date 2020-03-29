@@ -32,7 +32,7 @@ export class ModuleStateManager {
     const resultFiles: SubsetFilesState = {};
 
     const subset = new AllFilesSubset(mod);
-    await subset.walk(async (filename, stat) => {
+    await subset.walk(async(filename, stat) => {
       if (this.isInAnySubset(mod, filename)) {
         resultFiles[filename] = stat.mtime.valueOf();
       }
@@ -46,8 +46,8 @@ export class ModuleStateManager {
   }
 
 
-  public getSavedState(module: LocalModule): ModuleState | null {
-    const stateFilePath = this.getModuleStateFilePath(module);
+  public getSavedState(module: LocalModule, tag: string): ModuleState | null {
+    const stateFilePath = this.getModuleStateFilePath(module, tag);
 
     if (this._stateCache.has(stateFilePath)) {
       return this._stateCache.get(stateFilePath) || null;
@@ -75,8 +75,8 @@ export class ModuleStateManager {
   }
 
 
-  public saveState(module: LocalModule, state: ModuleState): void {
-    let stateFilePath = this.getModuleStateFilePath(module);
+  public saveState(module: LocalModule, tag: string, state: ModuleState): void {
+    let stateFilePath = this.getModuleStateFilePath(module, tag);
 
     fs.outputJSONSync(stateFilePath, state, {
       encoding: "utf-8"
@@ -86,8 +86,8 @@ export class ModuleStateManager {
   }
 
 
-  public async isSubsetChanged(module: LocalModule, subset: ModuleSubset): Promise<boolean> {
-    let savedState = this.getSavedState(module);
+  public async isSubsetChanged(module: LocalModule, tag: string, subset: ModuleSubset): Promise<boolean> {
+    let savedState = this.getSavedState(module, tag);
     if (!savedState) {
       return true;
     }
@@ -132,9 +132,9 @@ export class ModuleStateManager {
   }
 
 
-  private getModuleStateFilePath(module: LocalModule): string {
+  private getModuleStateFilePath(module: LocalModule, tag: string): string {
     let hash = crypto.createHash("sha256").update(module.path).digest("hex");
-    return path.join(STATE_DIR, `state-${ hash }.json`);
+    return path.join(STATE_DIR, `state-${tag}-${ hash }.json`);
   }
 
 

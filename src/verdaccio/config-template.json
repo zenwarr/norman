@@ -1,0 +1,29 @@
+{
+  "plugins": "./plugins",
+  "web": {
+    "title": "Verdaccio"
+  },
+  "uplinks": {
+    "npmjs": {
+      "url": "https://registry.npmjs.org/"
+    }
+  },
+  "packages": {
+    "**": {
+      "access": "$all",
+      "publish": "$all",
+      "unpublish": "$all",
+      "proxy": [
+        "npmjs"
+      ]
+    }
+  },
+  "server": {
+    "keepAliveTimeout": 60
+  },
+  "middlewares": {
+    "audit": {
+      "enabled": true
+    }
+  }
+}

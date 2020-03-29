@@ -10,4 +10,6 @@ export async function fetchLocalModule(mod: LocalModule) {
 
   let args: string[] = ["clone", mod.config.repository, "-b", mod.config.branch, mod.config.path];
   await utils.runCommand("git", args);
+
+  mod.reloadInfo();
 }

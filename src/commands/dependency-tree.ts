@@ -8,10 +8,10 @@ export async function dependencyTreeCommand() {
     return leaf.name ? leaf.name.name : "<no name>";
   }
 
-  let output: { name: string, deps: string }[] = [];
+  let output: { name: string; deps: string }[] = [];
 
   async function printModuleTree(leaf: LocalModule) {
-    let deps = getDirectLocalDeps(leaf).map(mod => getName(mod));
+    let deps = getDirectLocalDeps(leaf).map(getName);
     let depsLine = deps.length ? `[${ deps.join(", ") }]` : "";
 
     output.push({
