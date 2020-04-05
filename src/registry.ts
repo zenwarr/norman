@@ -5,6 +5,7 @@ import * as fs from "fs-extra";
 import { ServiceLocator } from "./locator";
 import { Config, getConfig, RegistryServerType } from "./config/config";
 import { getNpmRc } from "./npmrc";
+import { shutdown } from "./shutdown";
 
 
 function getUplinkNameFromUrl(url: string) {
@@ -134,13 +135,13 @@ export class NpmRegistry {
       this.proc.on("close", code => {
         if (!this.closeHasIntention) {
           console.error(chalk.red(`Verdaccio server closed: ${ code }`));
-          process.exit(-1);
+          shutdown(-1);
         }
       });
 
       this.proc.on("error", error => {
         console.error(chalk.red(`Verdaccio server error: ${ error.message }`));
-        process.exit(-1);
+        shutdown(-1);
       });
     });
   }
@@ -166,4 +167,9 @@ export class NpmRegistry {
 
 export function getRegistry() {
   return ServiceLocator.instance.get<NpmRegistry>("registry");
+}
+
+
+export function getRegistryIfExists() {
+  return ServiceLocator.instance.getIfExists<NpmRegistry>("registry");
 }

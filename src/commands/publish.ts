@@ -2,6 +2,7 @@ import { getArgs } from "../arguments";
 import { getProject } from "../project";
 import * as chalk from "chalk";
 import { LocalModule } from "../local-module";
+import { shutdown } from "../shutdown";
 
 
 export async function publishCommand() {
@@ -16,7 +17,7 @@ export async function publishCommand() {
   let module = config.modules.find(mod => mod.path === moduleDir);
   if (!module) {
     console.error(chalk.red("No local module found in current working directory"));
-    process.exit(-1);
+    shutdown(-1);
   }
 
   publishModule(module);

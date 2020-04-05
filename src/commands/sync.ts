@@ -12,6 +12,7 @@ import { walkModuleDependants } from "../dry-dependency-tree";
 import { Lockfile } from "../lockfile";
 import { needsPublish } from "./fetch";
 import { getRegistry, NpmRegistry } from "../registry";
+import { shutdown } from "../shutdown";
 
 
 export interface NpmViewInfo {
@@ -84,7 +85,7 @@ export async function publishModule(mod: LocalModule, info: NpmViewInfo): Promis
 
     let newVersion: string | undefined = response.version;
     if (!newVersion) {
-      process.exit(-1);
+      shutdown(-1);
     }
 
     console.log("Setting package version...");
@@ -178,13 +179,12 @@ export async function syncCommand() {
     let mod = project.modules.find(m => m.path === dir);
     if (!mod) {
       console.error(chalk.red("No local module found inside current working directory"));
-      process.exit(-1);
+      shutdown(-1);
     }
 
     if (!mod.useNpm) {
       console.log(chalk.red(`Cannot sync module: local module ${ mod.name } is not managed by npm`));
-      process.exit(-1);
-      return;
+      shutdown(-1);
     }
 
     await publishIfNeeded(mod);

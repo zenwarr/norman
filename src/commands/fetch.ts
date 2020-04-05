@@ -8,6 +8,7 @@ import { LocalModule } from "../local-module";
 import { buildModuleIfChanged } from "../build";
 import * as prompts from "prompts";
 import { arePublishDepsChanged, getNpmViewInfo, NpmViewInfo, publishIfNeeded } from "./sync";
+import { shutdown } from "../shutdown";
 
 
 export async function needsPublish(mod: LocalModule) {
@@ -34,7 +35,7 @@ export async function needsPublish(mod: LocalModule) {
       });
 
       if (answer.shouldPublish !== true) {
-        process.exit(-1);
+        shutdown(-1);
       }
 
       result = true;

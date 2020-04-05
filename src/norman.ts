@@ -16,6 +16,7 @@ import { NpmRegistry } from "./registry";
 import { ServiceLocator } from "./locator";
 import { Config } from "./config/config";
 import { startServerCommand } from "./commands/server";
+import { shutdown } from "./shutdown";
 
 
 async function asyncStart(): Promise<void> {
@@ -53,34 +54,26 @@ async function asyncStart(): Promise<void> {
 
 
 export function start(): void {
-  asyncStart().catch((error: Error) => {
-    console.log(chalk.red(`Error: ${ error.message }`));
-    console.error(error);
-    process.exit(-1);
+  // tslint:disable-next-line no-floating-promises
+  asyncStart().then(() => {
+    shutdown(0);
   });
 }
 
 
-function shutdown() {
-  let server = ServiceLocator.instance.getIfExists<NpmRegistry>("server");
-  if (server) {
-    server.stop();
-  }
-}
-
-
-process.on("exit", () => {
+process.on("SIGINT", () => {
+  console.log("sigint");
   shutdown();
 });
 
 
 process.on("unhandledRejection", (error: unknown) => {
   console.error(chalk.red("Unhandled rejection"), error);
-  process.exit(-1);
+  shutdown(-1);
 });
 
 
 process.on("uncaughtException", (error: Error) => {
   console.error(chalk.red("Uncaught exception"), error);
-  process.exit(-1);
+  shutdown(-1);
 });
