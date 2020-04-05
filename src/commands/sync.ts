@@ -16,6 +16,10 @@ import { getRegistry, NpmRegistry } from "../registry";
 
 export interface NpmViewInfo {
   isCurrentVersionPublished: boolean;
+
+  /**
+   * true if at least one version of this package is published on registry
+   */
   isOnRegistry: boolean;
   currentVersion: string;
 }
@@ -90,7 +94,8 @@ export async function publishModule(mod: LocalModule, info: NpmViewInfo): Promis
     publishedVersion = info.currentVersion;
     console.log(`Module "${ mod.checkedName.name }" is not yet published on npm registry.`);
   } else {
-    throw new Error("Method not implemented");
+    publishedVersion = info.currentVersion;
+    console.log(`Version ${ info.currentVersion } of module "${ mod.checkedName.name }" is not yet published on npm registry`);
   }
 
   let ignoreCopied = false;
@@ -160,7 +165,7 @@ export async function publishIfNeeded(mod: LocalModule) {
 
 export async function syncCommand() {
   let args = getArgs();
-  let config = getProject();
+  let project = getProject();
 
   if (args.subCommand !== "sync") {
     return;
@@ -170,7 +175,7 @@ export async function syncCommand() {
 
   try {
     let dir = process.cwd();
-    let mod = config.modules.find(m => m.path === dir);
+    let mod = project.modules.find(m => m.path === dir);
     if (!mod) {
       console.error(chalk.red("No local module found inside current working directory"));
       process.exit(-1);

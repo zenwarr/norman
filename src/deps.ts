@@ -10,10 +10,7 @@ function needsDepsInstall(mod: LocalModule): boolean {
     return false;
   }
 
-  let packagePath = path.join(mod.config.path, "node_modules");
-  if (fs.existsSync(packagePath)) {
-    return true;
-  }
+  let modulesDir = path.join(mod.config.path, "node_modules");
 
   let content: any;
   try {
@@ -26,10 +23,15 @@ function needsDepsInstall(mod: LocalModule): boolean {
     }
   }
 
-  return !!(
-      (content.dependencies && Object.keys(content.dependencies).length) ||
-      (content.devDependencies && Object.keys(content.devDependencies).length)
-  );
+  let depCount = Object.keys(content.dependencies || {}).length + Object.keys(content.devDependencies || {}).length;
+  let installedModulesCount: number;
+  if (!fs.existsSync(modulesDir)) {
+    installedModulesCount = 0;
+  } else {
+    installedModulesCount = fs.readdirSync(modulesDir).filter(x => !x.startsWith(".")).length;
+  }
+
+  return !!(depCount && !installedModulesCount);
 }
 
 

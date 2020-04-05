@@ -70,21 +70,23 @@ export class NpmRegistry {
       }
     }
 
+    // we need to change order and place wildcard matching all packages to the end of object
+    let defaultPackages = config.packages["**"];
+    delete config.packages["**"];
+    config.packages["**"] = defaultPackages;
+
     for (let uplinkDomain of uplinkDomains.entries()) {
       let url = uplinkDomain[0];
       let uplink = getUplinkNameFromUrl(url);
 
       let token = npmrc.getTokenForRegistry(url);
-      if (!token) {
-        throw new Error(`Token for registry "${ url }" not found in .nprmc`);
-      }
 
       config.uplinks[uplink] = {
         url,
-        auth: {
+        auth: token ? {
           type: "bearer",
           token
-        }
+        } : undefined
       };
     }
 
@@ -106,7 +108,7 @@ export class NpmRegistry {
     if (config.registryServerType === RegistryServerType.Remote) {
       return;
     } else if (config.registryServerType !== RegistryServerType.ManagedLocal) {
-      throw new Error("Unsupported serverType: " + config.registryServerType);
+      throw new Error("Unsupported registry server type: " + config.registryServerType);
     }
 
     return new Promise<void>((resolve, reject) => {

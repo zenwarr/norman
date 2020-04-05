@@ -11,6 +11,8 @@ import { arePublishDepsChanged, getNpmViewInfo, NpmViewInfo, publishIfNeeded } f
 
 
 export async function needsPublish(mod: LocalModule) {
+  await installModuleDepsIfNotInitialized(mod);
+
   let wasBuilt = await buildModuleIfChanged(mod);
 
   let publishDepsChanged = wasBuilt;
