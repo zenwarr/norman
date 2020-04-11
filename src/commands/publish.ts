@@ -1,4 +1,3 @@
-import { getArgs } from "../arguments";
 import { getProject } from "../project";
 import * as chalk from "chalk";
 import { LocalModule } from "../local-module";
@@ -6,12 +5,7 @@ import { shutdown } from "../shutdown";
 
 
 export async function publishCommand() {
-  let args = getArgs();
   let config = getProject();
-
-  if (args.subCommand !== "publish") {
-    return;
-  }
 
   let moduleDir = process.cwd();
   let module = config.modules.find(mod => mod.path === moduleDir);

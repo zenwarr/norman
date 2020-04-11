@@ -1,7 +1,7 @@
 import { getArgs } from "../arguments";
 import { getProject } from "../project";
 import { NpmRunner } from "../module-npm-runner";
-import { getRegistry, NpmRegistry } from "../registry";
+import { NpmRegistry } from "../registry";
 
 
 export async function npmCommand() {
@@ -21,9 +21,5 @@ export async function npmCommand() {
 
   await NpmRegistry.init();
 
-  try {
-    await NpmRunner.run(mod, args.args);
-  } finally {
-    getRegistry().stop();
-  }
+  await NpmRunner.run(mod, args.args);
 }

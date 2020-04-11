@@ -1,5 +1,5 @@
 import { LocalModule } from "../local-module";
-import { getDirectLocalDeps, walkAllLocalModules } from "../dry-dependency-tree";
+import { getDirectLocalDeps, walkAllLocalModules } from "../deps/dry-dependency-tree";
 import * as columnify from "columnify";
 
 

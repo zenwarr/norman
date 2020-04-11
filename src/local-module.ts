@@ -1,7 +1,7 @@
-import {Project} from "./project";
+import { Project } from "./project";
 import * as path from "path";
 import * as fs from "fs-extra";
-import ignore, {Ignore} from "ignore";
+import ignore, { Ignore } from "ignore";
 import gitUrlParse = require("git-url-parse");
 
 
@@ -50,7 +50,7 @@ export class LocalModule {
 
   public get checkedName() {
     if (!this._config.name) {
-      throw new Error(`Module at "${this.path}" has no name defined, but it is required at this stage`);
+      throw new Error(`Module at "${ this.path }" has no name defined, but it is required at this stage`);
     }
 
     return this._config.name;
@@ -219,7 +219,7 @@ export class LocalModule {
 
     const name = content.name;
     if (typeof name !== "string") {
-      throw new Error(`Failed to read version of package at "${dir}": looks like package.json file is invalid`);
+      throw new Error(`Failed to read version of package at "${ dir }": looks like package.json file is invalid`);
     }
 
     return name;
@@ -255,12 +255,12 @@ export class LocalModule {
 
 function npmNameFromPackageName(name: string): ModuleNpmName {
   if (name.indexOf("/") > 0) {
-    let [org, pkg] = name.split("/");
+    let [ org, pkg ] = name.split("/");
     if (org.startsWith("@")) {
       org = org.slice(1);
     }
-    return {scope: org, pkg, name: `@${org}/${pkg}`};
+    return { scope: org, pkg, name: `@${ org }/${ pkg }` };
   } else {
-    return {scope: undefined, pkg: name, name};
+    return { scope: undefined, pkg: name, name };
   }
 }

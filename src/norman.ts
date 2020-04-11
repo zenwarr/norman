@@ -3,20 +3,18 @@ import { Project } from "./project";
 import { listModulesCommand } from "./commands/list-modules";
 import { dependencyTreeCommand } from "./commands/dependency-tree";
 import { fetchCommand } from "./commands/fetch";
-import { syncCommand } from "./commands/sync";
 import { cleanCommand } from "./commands/clean";
-import { syncAllCommand } from "./commands/sync-all";
 import { ArgumentsManager, getArgs } from "./arguments";
 import { NpmRC } from "./npmrc";
 import { ModuleStateManager } from "./module-state-manager";
 import { npmCommand } from "./commands/npm";
 import { outdatedCommand } from "./upgrade/outdated-command";
 import { publishCommand } from "./commands/publish";
-import { NpmRegistry } from "./registry";
-import { ServiceLocator } from "./locator";
 import { Config } from "./config/config";
 import { startServerCommand } from "./commands/server";
 import { shutdown } from "./shutdown";
+import { syncCommand } from "./sync/sync-command";
+import { syncAllCommand } from "./sync/sync-all-command";
 
 
 async function asyncStart(): Promise<void> {

@@ -1,8 +1,8 @@
 import * as path from "path";
 import * as fs from "fs-extra";
-import { NpmRunner } from "./module-npm-runner";
-import { LocalModule } from "./local-module";
-import { buildModuleIfChanged } from "./build";
+import { NpmRunner } from "../module-npm-runner";
+import { LocalModule } from "../local-module";
+import { buildModuleIfChanged } from "../build";
 
 
 function needsDepsInstall(mod: LocalModule): boolean {

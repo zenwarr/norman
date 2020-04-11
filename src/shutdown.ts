@@ -2,9 +2,9 @@ import { getRegistryIfExists } from "./registry";
 
 
 export function shutdown(exitCode?: number): never {
-  let server = getRegistryIfExists();
-  if (server) {
-    server.stop();
+  let registry = getRegistryIfExists();
+  if (registry) {
+    registry.stop();
   }
 
   process.exit(exitCode);

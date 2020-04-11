@@ -1,6 +1,6 @@
-import { LocalModule } from "./local-module";
-import * as utils from "./utils";
-import { getProject } from "./project";
+import { LocalModule } from "../local-module";
+import * as utils from "../utils";
+import { getProject } from "../project";
 
 
 export enum WalkerAction {
@@ -90,5 +90,3 @@ export async function walkDryLocalTreeFromMultipleRoots(modules: LocalModule[], 
 export async function walkAllLocalModules(walker: LocalModuleWalker): Promise<void> {
   return walkDryLocalTreeFromMultipleRoots(getProject().modules, walker);
 }
-
-

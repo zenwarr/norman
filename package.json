@@ -33,6 +33,7 @@
     "@types/node": "~12.12.14",
     "@types/npm-packlist": "^1.1.1",
     "@types/prompts": "~2.0.5",
+    "@types/semver": "~7.1.0",
     "tslint": "^5.11.0",
     "typescript": "~3.7.3"
   },
@@ -47,6 +48,7 @@
     "minimatch": "~3.0.4",
     "npm-packlist": "^2.1.0",
     "prompts": "~2.3.2",
+    "semver": "~7.1.3",
     "verdaccio": "~4.5.1"
   },
   "bin": {
