@@ -4,6 +4,7 @@ import * as fs from "fs-extra";
 import * as path from "path";
 import * as semver from "semver";
 import * as chalk from "chalk";
+import { getPackageReader } from "../package-reader";
 
 
 export interface NpmViewInfo {
@@ -39,7 +40,7 @@ async function getNpmViewResult(mod: LocalModule) {
 
 
 export function getCurrentPackageVersion(mod: LocalModule): string | undefined {
-  let version = "" + fs.readJSONSync(path.join(mod.path, "package.json")).version;
+  let version = "" + getPackageReader().readPackageMetadata(mod.path).version;
   if (!semver.valid(version)) {
     console.error(chalk.yellow(`Incorrect version for package "${mod.checkedName.name}": "${version}", assuming it has no version...`));
     return undefined;

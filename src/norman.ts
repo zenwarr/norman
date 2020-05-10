@@ -16,12 +16,14 @@ import { shutdown } from "./shutdown";
 import { syncCommand } from "./sync/sync-command";
 import { syncAllCommand } from "./sync/sync-all-command";
 import { releaseCommand } from "./release/release-command";
+import { PackageReader } from "./package-reader";
 
 
 async function asyncStart(): Promise<void> {
   ArgumentsManager.init();
   Config.init();
   NpmRC.init();
+  PackageReader.init();
 
   let args = getArgs();
 

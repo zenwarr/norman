@@ -2,6 +2,7 @@ import * as child_process from "child_process";
 import * as chalk from "chalk";
 import * as fs from "fs-extra";
 import * as path from "path";
+import { getPackageReader } from "./package-reader";
 
 
 type ExtraRunOptions = {
@@ -99,8 +100,7 @@ function logProcessExecuteError(exitCode: number, command: string, args: null | 
 
 
 export function getDirectDeps(packagePath: string, includeDev: boolean = true): string[] {
-  let pkgPath = path.join(packagePath, "package.json");
-  let pkg = fs.readJSONSync(pkgPath, {encoding: "utf-8"});
+  let pkg = getPackageReader().readPackageMetadata(packagePath);
   let deps = Object.keys(pkg.dependencies || {});
   if (includeDev) {
     deps = deps.concat(Object.keys(pkg.devDependencies || {}));

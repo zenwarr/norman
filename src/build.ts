@@ -4,6 +4,7 @@ import { BuildDependenciesSubset } from "./subsets/build-dependencies-subset";
 import { getStateManager } from "./module-state-manager";
 import * as utils from "./utils";
 import * as fs from "fs-extra";
+import { getPackageReader } from "./package-reader";
 
 
 /**
@@ -42,7 +43,7 @@ async function buildModule(mod: LocalModule): Promise<void> {
 function hasNpmScript(mod: LocalModule, scriptName: string): boolean {
   let packageJSON: any;
   try {
-    packageJSON = fs.readJsonSync(path.join(mod.path, "package.json"));
+    packageJSON = getPackageReader().readPackageMetadata(mod.path);
   } catch (error) {
     if (error.code !== "ENOENT") {
       throw error;

@@ -3,6 +3,7 @@ import * as fs from "fs-extra";
 import { NpmRunner } from "../module-npm-runner";
 import { LocalModule } from "../local-module";
 import { buildModuleIfChanged } from "../build";
+import { getPackageReader } from "../package-reader";
 
 
 function needsDepsInstall(mod: LocalModule): boolean {
@@ -14,7 +15,7 @@ function needsDepsInstall(mod: LocalModule): boolean {
 
   let content: any;
   try {
-    content = fs.readJSONSync(path.join(mod.config.path, "package.json"));
+    content = getPackageReader().readPackageMetadata(mod.config.path);
   } catch (error) {
     if (error.code === "ENOENT") {
       return false;

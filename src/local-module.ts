@@ -3,6 +3,7 @@ import * as path from "path";
 import * as fs from "fs-extra";
 import ignore, { Ignore } from "ignore";
 import gitUrlParse = require("git-url-parse");
+import { getPackageReader } from "./package-reader";
 
 
 interface RawModuleConfig {
@@ -208,7 +209,7 @@ export class LocalModule {
     let content: any;
 
     try {
-      content = fs.readJSONSync(path.join(dir, "package.json"));
+      content = getPackageReader().readPackageMetadata(dir);
     } catch (error) {
       if (error.code === "ENOENT") {
         return undefined;
