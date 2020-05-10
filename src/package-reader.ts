@@ -4,15 +4,25 @@ import { ServiceLocator } from "./locator";
 
 
 export class PackageReader {
-  public readPackageMetadata(dirPath: string): any {
+  public readPackageMetadata(dirPath: string): any | undefined {
     let filePath = path.join(dirPath, "package.json");
 
     if (this._metadataCache.has(filePath)) {
       return this._metadataCache.get(filePath)!;
     }
 
-    let metadata = fs.readJSONSync(filePath);
-    if (typeof metadata !== "object") {
+    let metadata: object | undefined;
+    try {
+      metadata = fs.readJSONSync(filePath);
+    } catch (error) {
+      if (error.code === "ENOENT") {
+        metadata = undefined;
+      } else {
+        throw error;
+      }
+    }
+
+    if (metadata && typeof metadata !== "object") {
       throw new Error(`Expected contents of ${ filePath } to be object`);
     }
 
@@ -24,7 +34,7 @@ export class PackageReader {
     ServiceLocator.instance.initialize("packageReader", new PackageReader());
   }
 
-  private _metadataCache = new Map<string, object>();
+  private _metadataCache = new Map<string, object | undefined>();
 }
 
 

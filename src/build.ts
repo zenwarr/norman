@@ -41,15 +41,10 @@ async function buildModule(mod: LocalModule): Promise<void> {
 
 
 function hasNpmScript(mod: LocalModule, scriptName: string): boolean {
-  let packageJSON: any;
-  try {
-    packageJSON = getPackageReader().readPackageMetadata(mod.path);
-  } catch (error) {
-    if (error.code !== "ENOENT") {
-      throw error;
-    }
+  let meta = getPackageReader().readPackageMetadata(mod.path);
+  if (!meta) {
     return false;
   }
 
-  return Object.keys(packageJSON.scripts || {}).indexOf(scriptName) >= 0;
+  return Object.keys(meta.scripts || {}).indexOf(scriptName) >= 0;
 }

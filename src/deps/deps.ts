@@ -13,15 +13,9 @@ function needsDepsInstall(mod: LocalModule): boolean {
 
   let modulesDir = path.join(mod.config.path, "node_modules");
 
-  let content: any;
-  try {
-    content = getPackageReader().readPackageMetadata(mod.config.path);
-  } catch (error) {
-    if (error.code === "ENOENT") {
-      return false;
-    } else {
-      throw error;
-    }
+  let content = getPackageReader().readPackageMetadata(mod.config.path);
+  if (!content) {
+    return false;
   }
 
   let depCount = Object.keys(content.dependencies || {}).length + Object.keys(content.devDependencies || {}).length;

@@ -206,16 +206,9 @@ export class LocalModule {
 
 
   private static tryReadPackageName(dir: string): string | undefined {
-    let content: any;
-
-    try {
-      content = getPackageReader().readPackageMetadata(dir);
-    } catch (error) {
-      if (error.code === "ENOENT") {
-        return undefined;
-      } else {
-        throw error;
-      }
+    let content = getPackageReader().readPackageMetadata(dir);
+    if (!content) {
+      return undefined;
     }
 
     const name = content.name;
