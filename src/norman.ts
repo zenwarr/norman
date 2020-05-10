@@ -15,6 +15,7 @@ import { startServerCommand } from "./commands/server";
 import { shutdown } from "./shutdown";
 import { syncCommand } from "./sync/sync-command";
 import { syncAllCommand } from "./sync/sync-all-command";
+import { releaseCommand } from "./release/release-command";
 
 
 async function asyncStart(): Promise<void> {
@@ -39,7 +40,8 @@ async function asyncStart(): Promise<void> {
     outdated: outdatedCommand,
     npm: npmCommand,
     publish: publishCommand,
-    server: startServerCommand
+    server: startServerCommand,
+    release: releaseCommand
   };
 
   const command = COMMANDS[args.subCommand];

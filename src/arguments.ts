@@ -1,6 +1,7 @@
 import { ServiceLocator } from "./locator";
 import * as argparse from "argparse";
 import * as path from "path";
+import { ReleaseType } from "./release/release-types";
 
 
 export type Arguments = {
@@ -32,6 +33,10 @@ export type Arguments = {
   subCommand: "publish";
 } | {
   subCommand: "server";
+} | {
+  subCommand: "release";
+  releaseCommand: string;
+  beginReleaseType: ReleaseType;
 });
 
 
@@ -112,6 +117,17 @@ export class ArgumentsManager {
     subparsers.addParser("publish", { help: "Publish module" });
 
     subparsers.addParser("server", { help: "Start local npm registry server" });
+
+    let releaseParser = subparsers.addParser("release", { help: "Release management" });
+    let releaseCommandParser = releaseParser.addSubparsers({
+      title: "Release command",
+      dest: "releaseCommand"
+    });
+    let releaseBeginParser = releaseCommandParser.addParser("begin", { help: "Begin a new release" });
+    releaseBeginParser.addArgument("beginReleaseType", {
+      help: "Release type",
+      choices: [ "minor", "major", "patch", "hotfix" ]
+    });
 
     let args: Arguments = argparser.parseArgs();
     this._args = args;

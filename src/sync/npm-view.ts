@@ -3,6 +3,7 @@ import { NpmRunner } from "../module-npm-runner";
 import * as fs from "fs-extra";
 import * as path from "path";
 import * as semver from "semver";
+import * as chalk from "chalk";
 
 
 export interface NpmViewInfo {
@@ -12,7 +13,7 @@ export interface NpmViewInfo {
    * true if at least one version of this package is published on registry
    */
   isOnRegistry: boolean;
-  currentVersion: string;
+  currentVersion?: string;
 
   /**
    * Version marked with `latest` dist-tag
@@ -37,8 +38,24 @@ async function getNpmViewResult(mod: LocalModule) {
 }
 
 
+export function getCurrentPackageVersion(mod: LocalModule): string | undefined {
+  let version = "" + fs.readJSONSync(path.join(mod.path, "package.json")).version;
+  if (!semver.valid(version)) {
+    console.error(chalk.yellow(`Incorrect version for package "${mod.checkedName.name}": "${version}", assuming it has no version...`));
+    return undefined;
+  }
+
+  return version;
+}
+
+
+export async function setPackageVersion(mod: LocalModule, version: string) {
+  await NpmRunner.run(mod, [ "version", version, "--no-git-tag-version" ]);
+}
+
+
 export async function getNpmViewInfo(mod: LocalModule): Promise<NpmViewInfo> {
-  let currentVersion = fs.readJSONSync(path.join(mod.path, "package.json")).version;
+  let currentVersion = getCurrentPackageVersion(mod);
 
   let packageInfo = await getNpmViewResult(mod);
   if (packageInfo.error != null) {

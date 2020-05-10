@@ -2,7 +2,7 @@ import { LocalModule } from "../local-module";
 import { getStateManager } from "../module-state-manager";
 import { PublishDependenciesSubset } from "../subsets/publish-dependencies-subset";
 import { buildModuleIfChanged } from "../build";
-import { getNpmViewInfo, NpmViewInfo } from "./npm-view";
+import { getNpmViewInfo, NpmViewInfo, setPackageVersion } from "./npm-view";
 import * as prompts from "prompts";
 import { shutdown } from "../shutdown";
 import { NpmRunner } from "../module-npm-runner";
@@ -56,11 +56,15 @@ async function needsPublish(mod: LocalModule) {
 async function publishModule(mod: LocalModule, info: NpmViewInfo): Promise<string> {
   let publishedVersion: string | undefined;
 
-  if (info.isCurrentVersionPublished) {
+  if (info.isCurrentVersionPublished || !info.currentVersion) {
+    let message = info.currentVersion
+        ? `Version ${ info.currentVersion } of module "${ mod.checkedName.name }" is already published on npm registry. Please set another version: `
+        : `Module "${mod.checkedName.name}" has no version set in package.json. Please set its version: `;
+
     let response = await prompts({
       type: "text",
       name: "version",
-      message: `Version ${ info.currentVersion } of module "${ mod.checkedName.name }" is already published on npm registry. Please set another version: `
+      message
     });
 
     let newVersion: string | undefined = response.version;
@@ -69,7 +73,7 @@ async function publishModule(mod: LocalModule, info: NpmViewInfo): Promise<strin
     }
 
     console.log("Setting package version...");
-    await NpmRunner.run(mod, [ "version", newVersion, "--no-git-tag-version" ]);
+    await setPackageVersion(mod, newVersion);
     publishedVersion = newVersion;
   } else if (!info.isOnRegistry) {
     publishedVersion = info.currentVersion;
