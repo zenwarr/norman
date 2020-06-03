@@ -1,7 +1,9 @@
 import * as fs from "fs-extra";
 import * as path from "path";
-import { resolveRegistryUrl } from "./registry-paths";
-import { LocalModule } from "./local-module";
+import * as url from "url";
+import { LocalModule, npmNameFromPackageName } from "./local-module";
+import { getRegistryForPackage } from "./registry-paths";
+import { getRegistry } from "./registry";
 
 
 const LOCKFILE_NAME = "package-lock.json";
@@ -21,6 +23,11 @@ export interface LockfileDependency {
   optional?: boolean;
   requires?: { [name: string]: string };
   dependencies?: DependencyMap;
+}
+
+
+function getHostFromUrl(u: string) {
+  return new url.URL(u).host;
 }
 
 
@@ -60,12 +67,34 @@ export class Lockfile {
   }
 
 
-  public updateResolveUrl() {
+  public updateResolveUrl(localHost: string) {
+    let registryHost = getHostFromUrl(getRegistry().address);
+
     this.mutateDependencies(dep => {
       if (dep.resolved) {
-        dep.resolved = resolveRegistryUrl(dep.resolved, dep.version);
+        dep.resolved = this.resolveRegistryUrl(dep.resolved, registryHost);
       }
     });
+  }
+
+
+  private resolveRegistryUrl(oldResolvedUrl: string, registryHost: string) {
+    let parsedURL = new url.URL(oldResolvedUrl);
+    if (parsedURL.host !== registryHost) {
+      return oldResolvedUrl;
+    }
+
+    let pathParts = parsedURL.pathname.split("/");
+    if (pathParts.length < 2) {
+      return oldResolvedUrl;
+    }
+
+    let packageName = decodeURIComponent(pathParts[1]);
+
+    parsedURL.host = getHostFromUrl(getRegistryForPackage(npmNameFromPackageName(packageName)));
+    parsedURL.port = "";
+
+    return parsedURL.toString();
   }
 
 
@@ -95,7 +124,7 @@ export class Lockfile {
   private mutateDependencies(walker: DependencyWalker): void {
     const content = this.load();
     if (content.dependencies) {
-      this._walkDependencies("", content.dependencies, walker);
+      this._walkDependencies(undefined, content.dependencies, walker);
     }
     fs.writeJSONSync(this.filename, content, {
       spaces: 2
@@ -103,7 +132,7 @@ export class Lockfile {
   }
 
 
-  private _walkDependencies(parentPath: string, deps: DependencyMap, walker: DependencyWalker) {
+  private _walkDependencies(parentPath: string | undefined, deps: DependencyMap, walker: DependencyWalker) {
     for (const depName of Object.keys(deps)) {
       const dep = deps[depName];
       const depPath = parentPath ? `${ parentPath }/${ depName }` : depName;

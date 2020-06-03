@@ -5,6 +5,7 @@ import { walkAllLocalModules } from "../deps/dry-dependency-tree";
 import { fetchLocalModule } from "../fetch";
 import { installModuleDepsIfNotInitialized } from "../deps/deps";
 import { publishModuleIfChanged } from "../sync/publish";
+import { getNpmViewInfo } from "../sync/npm-view";
 
 
 export async function fetchCommand() {

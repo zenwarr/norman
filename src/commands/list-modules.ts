@@ -1,6 +1,6 @@
 import { getProject } from "../project";
 import * as columnify from "columnify";
-import { getRegistryForModule } from "../registry-paths";
+import { getRegistryForPackage } from "../registry-paths";
 
 
 export async function listModulesCommand() {
@@ -9,7 +9,7 @@ export async function listModulesCommand() {
   const data = config.modules.map(module => ({
     name: module.name ? module.name.name : "<no name>",
     path: module.path,
-    registry: getRegistryForModule(module),
+    registry: getRegistryForPackage(module.checkedName),
     useNpm: module.useNpm
   }));
 

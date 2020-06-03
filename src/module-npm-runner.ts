@@ -32,29 +32,10 @@ export namespace NpmRunner {
       args = [ args ];
     }
 
-    // await utils.cleanNpmCache();
-
-    // let lockfile: Lockfile | undefined;
-    // let lockfileModifyTs: number | undefined;
-    // if (Lockfile.existsInModule(module)) {
-    //   lockfile = Lockfile.forModule(module);
-    //   lockfile.updateIntegrity();
-    //   lockfileModifyTs = fs.statSync(lockfile.filename).mtimeMs;
-    // }
-
     return utils.runCommand(utils.getNpmExecutable(), args, {
       cwd: module.path,
       env: buildNpmEnv(),
       ...options
     });
-    //
-    // if (lockfile) {
-    //   let afterModifyTs = fs.statSync(lockfile.filename).mtimeMs;
-    //   if (afterModifyTs !== lockfileModifyTs) {
-    //     lockfile.updateResolveUrl();
-    //   }
-    // }
-
-    // return result;
   }
 }

@@ -22,7 +22,9 @@ export function getDirectLocalDeps(module: LocalModule): LocalModule[] {
   }
 
   const config = getProject();
-  return utils.getDirectDeps(module.path).map(moduleName => config.getModuleInfo(moduleName)).filter(dep => dep != null) as LocalModule[];
+  return utils.getDirectDeps(module.path)
+  .map(moduleName => config.getModuleInfo(moduleName))
+  .filter(dep => dep != null) as LocalModule[];
 }
 
 

@@ -17,6 +17,7 @@ import { syncCommand } from "./sync/sync-command";
 import { syncAllCommand } from "./sync/sync-all-command";
 import { releaseCommand } from "./release/release-command";
 import { PackageReader } from "./package-reader";
+import { NpmInfoReader } from "./npm-info-reader";
 
 
 async function asyncStart(): Promise<void> {
@@ -24,6 +25,7 @@ async function asyncStart(): Promise<void> {
   Config.init();
   NpmRC.init();
   PackageReader.init();
+  NpmInfoReader.init();
 
   let args = getArgs();
 

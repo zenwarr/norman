@@ -25,6 +25,8 @@ export interface NpmViewInfo {
    * Greatest version (not necessary marked by `latest` tag)
    */
   greatestVersion: string | undefined;
+
+  publishedVersions: string[];
 }
 
 
@@ -40,9 +42,14 @@ async function getNpmViewResult(mod: LocalModule) {
 
 
 export function getCurrentPackageVersion(mod: LocalModule): string | undefined {
-  let version = "" + getPackageReader().readPackageMetadata(mod.path).version;
+  let packageJSON = getPackageReader().readPackageMetadata(mod.path);
+  if (!packageJSON) {
+    return undefined;
+  }
+
+  let version = "" + packageJSON.version;
   if (!semver.valid(version)) {
-    console.error(chalk.yellow(`Incorrect version for package "${mod.checkedName.name}": "${version}", assuming it has no version...`));
+    console.error(chalk.yellow(`Incorrect version for package "${ mod.checkedName.name }": "${ version }", assuming it has no version...`));
     return undefined;
   }
 
@@ -66,10 +73,11 @@ export async function getNpmViewInfo(mod: LocalModule): Promise<NpmViewInfo> {
         isOnRegistry: false,
         currentVersion,
         latestTagVersion: undefined,
-        greatestVersion: undefined
+        greatestVersion: undefined,
+        publishedVersions: []
       };
     } else {
-      throw new Error("Failed to get package information: " + packageInfo.error.summary);
+      throw new Error(`Failed to get package information (${ mod.checkedName.name }): ${ packageInfo.error.summary }`);
     }
   }
 
@@ -82,8 +90,9 @@ export async function getNpmViewInfo(mod: LocalModule): Promise<NpmViewInfo> {
     isCurrentVersionPublished: versions.includes(currentVersion),
     isOnRegistry: true,
     currentVersion,
-    latestTagVersion: packageInfo["dist-tags"]?.latest || undefined,
-    greatestVersion: getGreatestVersion(versions) || undefined
+    latestTagVersion: packageInfo["dist-tags"]?.latestё || undefined,
+    greatestVersion: getGreatestVersion(versions) || undefined,
+    publishedVersions: versions
   };
 }
 

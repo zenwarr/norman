@@ -247,7 +247,7 @@ export class LocalModule {
 }
 
 
-function npmNameFromPackageName(name: string): ModuleNpmName {
+export function npmNameFromPackageName(name: string): ModuleNpmName {
   if (name.indexOf("/") > 0) {
     let [ org, pkg ] = name.split("/");
     if (org.startsWith("@")) {

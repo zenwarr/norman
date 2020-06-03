@@ -45,7 +45,7 @@ export async function releaseCommand() {
 
   let mod = getCwdModule();
   if (!mod.useNpm) {
-    console.error(chalk.red(`Cannot release current module: does not use npm`));
+    console.error(chalk.red("Cannot release current module: does not use npm"));
     shutdown(-1);
   }
 
